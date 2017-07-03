@@ -1,0 +1,73 @@
+=head1 NAME
+
+ArrayBuffer - A byte data block
+
+=head1 SYNOPSIS
+
+  use ArrayBuffer;
+  
+  $ab = ArrayBuffer->new (42);
+  warn $ab->byte_length; # 42
+
+=head1 DESCRIPTION
+
+The C<ArrayBuffer> class can be used to wrap a byte data, in a similar
+way to the JavaScript C<ArrayBuffer> objects.
+
+=head1 METHODS
+
+Following methods are available:
+
+=over 4
+
+=item $buffer = ArrayBuffer->new ($byte_length)
+
+Create and return a new L<ArrayBuffer> object whose data block
+contains a sequence of bytes whose length is specified as the
+argument.  The argument must be a non-negative integer.
+
+=item $buffer = ArrayBuffer->new_from_scalarref ($scalarref)
+
+Create and return a new L<ArrayBuffer> object whose data block is a
+byte string.
+
+The argument must be a scalar reference.  It must reference a byte
+string.  After the invocation of this method, the referenced scalar
+value must not be directly read or modified by the application.
+
+=item $scalarref = $buffer->manakai_transfer_to_scalarref
+
+Return a reference to a byte string whose value is the bytes
+represented by the L<ArrayBuffer>.  By the invocation of this method,
+the L<ArrayBuffer> object is detached.
+
+This method can no longer be used once the L<ArrayBuffer> is detached.
+
+=item $byte_length = $buffer->byte_length
+
+Return a non-negative integer representing the number of bytes in the
+L<ArrayBuffer> data block.
+
+This method can no longer be used once the L<ArrayBuffer> is detached.
+
+=back
+
+=head1 SEE ALSO
+
+ECMASCript C<ArrayBuffer> object
+<https://tc39.github.io/ecma262/#sec-arraybuffer-objects>.
+
+Streams Standard <https://streams.spec.whatwg.org/>.
+
+=head1 AUTHOR
+
+Wakaba <wakaba@suikawiki.org>.
+
+=head1 LICENSE
+
+Copyright 2017 Wakaba <wakaba@suikawiki.org>.
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut
