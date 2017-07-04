@@ -307,6 +307,27 @@ test {
   done $c;
 } n => 6, name => '_clone';
 
+test {
+  my $c = shift;
+  my $ref1 = \"abcdefghijklmn";
+  my $ab1 = ArrayBuffer->new_from_scalarref ($ref1);
+  my $ab2 = ArrayBuffer->_clone ($ab1, 6, 4);
+  is $ab2->byte_length, 4;
+  my $ref2 = $ab2->manakai_transfer_to_scalarref;
+  is $$ref2, "ghij";
+  done $c;
+} n =>2, name => '_clone allocated';
+
+test {
+  my $c = shift;
+  my $ab1 = ArrayBuffer->new (30);
+  my $ab2 = ArrayBuffer->_clone ($ab1, 6, 4);
+  is $ab2->byte_length, 4;
+  my $ref2 = $ab2->manakai_transfer_to_scalarref;
+  is $$ref2, "\x00\x00\x00\x00";
+  done $c;
+} n =>2, name => '_clone not allocated';
+
 run_tests;
 
 =head1 LICENSE

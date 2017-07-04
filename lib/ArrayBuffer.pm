@@ -27,13 +27,18 @@ sub new ($$) {
   ## AllocateArrayBuffer
   {
     # XXX throw RangeError if $length is too large?
-    $self->{array_buffer_data} = \("\x00" x $length); # CreateByteDataBlock (can throw RangeError)
     $self->{array_buffer_byte_length} = $length;
+
+    #$self->{array_buffer_data} = \("\x00" x $length); # CreateByteDataBlock (can throw RangeError)
+    ## Not in JS:
+    $self->{array_buffer_data} = '';
+    $self->{allocation_delayed} = 1;
   }
 
   return $self;
 } # new
 
+## Not in JS
 sub new_from_scalarref ($$) {
   die _type_error "The argument is not a SCALAR"
       unless defined $_[1] and (ref $_[1] eq 'SCALAR' or ref $_[1] eq 'LVALUE');
@@ -50,9 +55,11 @@ sub new_from_scalarref ($$) {
 ## must be an ArrayBuffer that is not detached.
 sub _transfer ($) {
   my $transferred = bless {
-    array_buffer_data => $_[0]->{array_buffer_data},
     array_buffer_byte_length => $_[0]->{array_buffer_byte_length},
+    array_buffer_data => $_[0]->{array_buffer_data},
   }, (ref $_[0]);
+  $transferred->{allocation_delayed} = 1
+      if delete $_[0]->{allocation_delayed}; # Not in JS
 
   ## DetachArrayBuffer
   {
@@ -63,10 +70,14 @@ sub _transfer ($) {
   return $transferred
 } # _transfer
 
+## Not in JS
 sub manakai_transfer_to_scalarref ($) {
   die _type_error ('ArrayBuffer is detached')
       if not defined $_[0]->{array_buffer_data}; ## IsDetachedBuffer
 
+  if ($_[0]->{allocation_delayed}) {
+    $_[0]->{array_buffer_data} = \("\x00" x $_[0]->{array_buffer_byte_length});
+  }
   my $ref = $_[0]->{array_buffer_data};
 
   ## DetachArrayBuffer
@@ -95,8 +106,13 @@ sub _clone ($$$$) {
       if not defined $src_buffer->{array_buffer_data}; ## IsDetachedBuffer
 
   ## AllocateArrayBuffer, CopyDataBlockBytes
-  my $target_block_value = substr (${$src_buffer->{array_buffer_data}}, $src_byte_offset, $src_length);
-  return ArrayBuffer->new_from_scalarref (\$target_block_value);
+  if ($src_buffer->{allocation_delayed}) { # Not in JS
+    my $target_block_value = "\x00" x $src_length;
+    return ArrayBuffer->new_from_scalarref (\$target_block_value);
+  } else {
+    my $target_block_value = substr (${$src_buffer->{array_buffer_data}}, $src_byte_offset, $src_length);
+    return ArrayBuffer->new_from_scalarref (\$target_block_value);
+  }
 
   # XXX string copy counter for debugging
 } # _clone
