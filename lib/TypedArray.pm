@@ -2,7 +2,6 @@ package TypedArray;
 use strict;
 use warnings;
 our $VERSION = '1.0';
-use Carp;
 
 use ArrayBuffer;
 BEGIN {

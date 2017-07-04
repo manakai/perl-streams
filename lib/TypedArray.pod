@@ -100,7 +100,7 @@ always true:
 
 =head1 SEE ALSO
 
-L<ArrayBuffer>.
+L<ArrayBuffer>, L<DataView>.
 
 ECMAScript TypedArray Objects
 <https://tc39.github.io/ecma262/#sec-typedarray-objects>.

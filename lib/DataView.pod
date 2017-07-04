@@ -1,0 +1,76 @@
+=head1 NAME
+
+DataView - View of buffer
+
+=head1 SYNOPSIS
+
+  use DataView;
+  
+  $dv = DataView->new ($arraybuffer, $offset, $length);
+
+=head1 DESCRIPTION
+
+The C<DataView> class is a view of L<ArrayBuffer>, located by offset
+and length, similar to JavaScript C<DataView> objects.
+
+=head1 METHODS
+
+Following methods are available:
+
+=over 4
+
+=item $dv = DataView->new ($array_buffer[, $byte_offset[, $length]])
+
+Create and return a new L<DataView> object.  It represents a view of
+the L<ArrayBuffer> specified as the first argument.
+
+The second argument specifies the byte offset of the view.  The second
+argument must be a non-negative integer not greater than the number of
+the bytes in the L<ArrayBuffer>.  If this argument is omitted, the
+byte offset is set to zero.
+
+The third argument specifies the byte length of the view.  The third
+argument must be a non-negative integer not greater than the number of
+the bytes after the byte offset in the L<ArrayBuffer>.  If this
+argument is omitted, all the bytes between the byte offset and the end
+of the buffer are part of the view.
+
+=item $arraybuffer = $dv->buffer
+
+Return the L<ArrayBuffer> of the L<DataView>.
+
+=item $byte_offset = $dv->byte_offset
+
+Return the byte offset of the view of the L<DataView>.
+
+This method throws if the L<ArrayBuffer> of the L<DataView> is
+detached.
+
+=item $byte_length = $ta->byte_length
+
+Return the number of the bytes in the view of the L<DataView>.
+
+This method throws if the L<ArrayBuffer> of the L<DataView> is
+detached.
+
+=back
+
+=head1 SEE ALSO
+
+L<ArrayBuffer>, L<TypedArray>.
+
+ECMAScript DataView Objects
+<https://tc39.github.io/ecma262/#sec-dataview-objects>.
+
+=head1 AUTHOR
+
+Wakaba <wakaba@suikawiki.org>.
+
+=head1 LICENSE
+
+Copyright 2017 Wakaba <wakaba@suikawiki.org>.
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut
