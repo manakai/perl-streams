@@ -1,0 +1,119 @@
+=head1 NAME
+
+TypedArray - Array-like view of buffer
+
+=head1 SYNOPSIS
+
+  use TypedArray;
+  
+  $ta = TypedArray::Uint8Array->new ($arraybuffer, $offset, $length);
+
+=head1 DESCRIPTION
+
+The C<TypedArray> classes are views of L<ArrayBuffer>, located by
+offset and length, similar to JavaScript Typed Array objects.
+
+There is the following class: L<TypedArray::Uint8Array>, which can be
+loaded by C<use TypedArray>.  (Other Typed Array classes are not
+supported yet.)
+
+=head1 METHODS
+
+Following methods are available:
+
+=over 4
+
+=item $ta = $class->new ($array_buffer[, $byte_offset[, $length]])
+
+Create and return a new L<TypedArray> object of the specified class.
+It represents a view of the L<ArrayBuffer> specified as the first
+argument.
+
+The second argument specifies the byte offset of the view.  The second
+argument must be a non-negative integer not greater than the number of
+the bytes in the L<ArrayBuffer>.  If this argument is omitted, the
+byte offset is set to zero.
+
+The third argument specifies the length of the view.  The third
+argument must be a non-negative integer not greater than the possible
+number of array items in the L<ArrayBuffer> after the byte offset.  If
+this argument is omitted, all the bytes between the byte offset and
+the end of the buffer are part of the view.
+
+=item $ta = $class->new ($length)
+
+Create and return a new L<TypedArray> object of the specified class
+with a new L<ArrayBuffer>.
+
+The argument specifies the length of the view, i.e. the number of
+array items.
+
+=item $ta = TypedArray::Uint8Array->new_by_sysread ($fh, $byte_length)
+
+Create a return a new L<TypedArray::Uint8Array> object with a new
+L<ArrayBuffer>.
+
+The L<ArrayBuffer> is created using the result of a C<sysread> call.
+The first argument must be a Perl filehandle.  The second argument
+must be a maximum number of bytes to read.  These are used as
+arguments to the C<sysread>.
+
+This method throws if the C<sysread> call fails.
+
+=item $arraybuffer = $ta->buffer
+
+Return the L<ArrayBuffer> of the L<TypedArray>.
+
+=item $byte_offset = $ta->byte_offset
+
+Return the byte offset of the view of the L<TypedArray>.
+
+This method returns zero if the L<ArrayBuffer> of the L<TypedArray> is
+detached.
+
+=item $byte_length = $ta->byte_length
+
+Return the number of the bytes in the view of the L<TypedArray>.
+
+This method returns zero if the L<ArrayBuffer> of the L<TypedArray> is
+detached.
+
+=item $length = $ta->length
+
+Return the number of array items in the view of the L<TypedArray>.
+
+This method returns zero if the L<ArrayBuffer> of the L<TypedArray> is
+detached.
+
+=item $byte_length = $ta->BYTES_PER_ELEMENT
+
+=item $byte_length = $class->BYTES_PER_ELEMENT
+
+Return the number of bytes in an array item.
+
+For any object of a L<TypedArray> subclass, the following equation is
+always true:
+
+  $ta->byte_length == $ta->length * $ta->BYTES_PER_ELEMENT
+
+=back
+
+=head1 SEE ALSO
+
+L<ArrayBuffer>.
+
+ECMAScript TypedArray Objects
+<https://tc39.github.io/ecma262/#sec-typedarray-objects>.
+
+=head1 AUTHOR
+
+Wakaba <wakaba@suikawiki.org>.
+
+=head1 LICENSE
+
+Copyright 2017 Wakaba <wakaba@suikawiki.org>.
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut

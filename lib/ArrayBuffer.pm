@@ -13,8 +13,12 @@ $ArrayBuffer::CreateTypeError ||= sub ($$) {
 $ArrayBuffer::CreateRangeError ||= sub ($$) {
   return "RangeError: " . $_[1] . Carp::shortmess ();
 };
+$ArrayBuffer::CreateNotSupportedError ||= sub ($$) {
+  return "NotSupportedError: " . $_[1] . Carp::shortmess ();
+};
 sub _type_error ($) { $ArrayBuffer::CreateTypeError->(undef, $_[0]) }
 sub _range_error ($) { $ArrayBuffer::CreateRangeError->(undef, $_[0]) }
+sub _not_supported_error ($) { $ArrayBuffer::CreateNotSupportedError->(undef, $_[0]) }
 
 ## ArrayBuffer constructor
 sub new ($$) {

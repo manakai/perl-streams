@@ -54,7 +54,9 @@ This method can no longer be used once the L<ArrayBuffer> is detached.
 
 =head1 SEE ALSO
 
-ECMASCript C<ArrayBuffer> object
+L<TypedArray>.
+
+ECMAScript ArrayBuffer Objects
 <https://tc39.github.io/ecma262/#sec-arraybuffer-objects>.
 
 Streams Standard <https://streams.spec.whatwg.org/>.
