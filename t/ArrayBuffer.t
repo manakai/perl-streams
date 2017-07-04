@@ -16,11 +16,60 @@ test {
 
 test {
   my $c = shift;
+  my $ab = ArrayBuffer->new ("0 but true");
+  isa_ok $ab, 'ArrayBuffer';
+  is $ab->byte_length, 0;
+  done $c;
+} n => 2, name => 'new 0 but true';
+
+test {
+  my $c = shift;
   my $ab = ArrayBuffer->new (2000);
   isa_ok $ab, 'ArrayBuffer';
   is $ab->byte_length, 2000;
   done $c;
 } n => 2, name => 'new 2000';
+
+test {
+  my $c = shift;
+  my $ab = ArrayBuffer->new (30.2);
+  isa_ok $ab, 'ArrayBuffer';
+  is $ab->byte_length, 30;
+  done $c;
+} n => 2, name => 'new float';
+
+test {
+  my $c = shift;
+  my $ab = ArrayBuffer->new ("642abac");
+  isa_ok $ab, 'ArrayBuffer';
+  is $ab->byte_length, 642;
+  done $c;
+} n => 2, name => 'new number string';
+
+test {
+  my $c = shift;
+  my $ab = ArrayBuffer->new ("abcde");
+  isa_ok $ab, 'ArrayBuffer';
+  is $ab->byte_length, 0;
+  done $c;
+} n => 2, name => 'new string';
+
+test {
+  my $c = shift;
+  eval {
+    ArrayBuffer->new (-32);
+  };
+  like $@, qr{^RangeError: Byte length -32 is negative};
+  done $c;
+} n => 1, name => 'new negative';
+
+test {
+  my $c = shift;
+  my $ab = ArrayBuffer->new;
+  isa_ok $ab, 'ArrayBuffer';
+  is $ab->byte_length, 0;
+  done $c;
+} n => 2, name => 'new undef';
 
 test {
   my $c = shift;
@@ -42,6 +91,45 @@ test {
 
 test {
   my $c = shift;
+  my $s = "\x80\xFE";
+  my $ab = ArrayBuffer->new_from_scalarref (\$s);
+  isa_ok $ab, 'ArrayBuffer';
+  is $ab->byte_length, 2;
+  done $c;
+} n => 2, name => 'new_from_scalarref bytes';
+
+test {
+  my $c = shift;
+  my $s = "\x{524}abc\x{65000}";
+  eval {
+    ArrayBuffer->new_from_scalarref (\$s);
+  };
+  like $@, qr{^TypeError: The argument is a utf8-flaged string at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
+  done $c;
+} n => 1, name => 'new_from_scalarref utf8';
+
+test {
+  my $c = shift;
+  my $s = substr "\x{524}abc\x{65000}", 1, 3;
+  eval {
+    ArrayBuffer->new_from_scalarref (\$s);
+  };
+  like $@, qr{^TypeError: The argument is a utf8-flaged string at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
+  done $c;
+} n => 1, name => 'new_from_scalarref utf8';
+
+test {
+  my $c = shift;
+  my $s = "\x{524}abc\x{65000}";
+  eval {
+    ArrayBuffer->new_from_scalarref (\substr $s, 1, 3);
+  };
+  like $@, qr{^TypeError: The argument is a utf8-flaged string at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
+  done $c;
+} n => 1, name => 'new_from_scalarref utf8';
+
+test {
+  my $c = shift;
   my $s = substr "x" x 1042, 50, 52;
   my $ab = ArrayBuffer->new_from_scalarref (\$s);
   isa_ok $ab, 'ArrayBuffer';
@@ -54,7 +142,7 @@ test {
   eval {
     ArrayBuffer->new_from_scalarref ();
   };
-  like $@, qr{^TypeError: Not a SCALAR at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
+  like $@, qr{^TypeError: The argument is not a SCALAR at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
   done $c;
 } n => 1, name => 'new_from_scalarref no argument';
 
@@ -63,7 +151,7 @@ test {
   eval {
     ArrayBuffer->new_from_scalarref ([]);
   };
-  like $@, qr{^TypeError: Not a SCALAR at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
+  like $@, qr{^TypeError: The argument is not a SCALAR at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
   done $c;
 } n => 1, name => 'new_from_scalarref bad argument';
 
@@ -72,7 +160,7 @@ test {
   eval {
     ArrayBuffer->new_from_scalarref ("abcde");
   };
-  like $@, qr{^TypeError: Not a SCALAR at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
+  like $@, qr{^TypeError: The argument is not a SCALAR at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
   done $c;
 } n => 1, name => 'new_from_scalarref no argument';
 

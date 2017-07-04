@@ -10,12 +10,19 @@ use Carp;
 $ArrayBuffer::CreateTypeError ||= sub ($$) {
   return "TypeError: " . $_[1] . Carp::shortmess ();
 };
+$ArrayBuffer::CreateRangeError ||= sub ($$) {
+  return "RangeError: " . $_[1] . Carp::shortmess ();
+};
 sub _type_error ($) { $ArrayBuffer::CreateTypeError->(undef, $_[0]) }
+sub _range_error ($) { $ArrayBuffer::CreateRangeError->(undef, $_[0]) }
 
 ## ArrayBuffer constructor
 sub new ($$) {
   my $self = bless {}, $_[0];
-  my $length = 0+$_[1]; ## ToIndex
+
+  ## ToIndex for Perl
+  my $length = int $_[1];
+  die _range_error "Byte length $length is negative" if $length < 0;
 
   ## AllocateArrayBuffer
   {
@@ -28,8 +35,9 @@ sub new ($$) {
 } # new
 
 sub new_from_scalarref ($$) {
-  die _type_error ("Not a SCALAR")
+  die _type_error "The argument is not a SCALAR"
       unless defined $_[1] and (ref $_[1] eq 'SCALAR' or ref $_[1] eq 'LVALUE');
+  die _type_error "The argument is a utf8-flaged string" if utf8::is_utf8 ${$_[1]};
   my $self = bless {}, $_[0];
 
   $self->{array_buffer_data} = $_[1];
