@@ -14,7 +14,6 @@ sub new ($$) {
 
   ## AllocateArrayBuffer
   {
-    # XXX throw RangeError if $length is too large?
     $self->{array_buffer_byte_length} = $length;
 
     #$self->{array_buffer_data} = \("\x00" x $length); # CreateByteDataBlock (can throw RangeError)

@@ -32,6 +32,14 @@ test {
 
 test {
   my $c = shift;
+  my $ab = ArrayBuffer->new (2**32-1);
+  isa_ok $ab, 'ArrayBuffer';
+  is $ab->byte_length, -1 + 2**31 + 2**31;
+  done $c;
+} n => 2, name => 'new 2^32-1';
+
+test {
+  my $c = shift;
   my $ab = ArrayBuffer->new (30.2);
   isa_ok $ab, 'ArrayBuffer';
   is $ab->byte_length, 30;
@@ -59,9 +67,36 @@ test {
   eval {
     ArrayBuffer->new (-32);
   };
-  like $@, qr{^RangeError: Byte length -32 is negative};
+  like $@, qr{^RangeError: Byte length -32 is negative at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
   done $c;
 } n => 1, name => 'new negative';
+
+test {
+  my $c = shift;
+  eval {
+    ArrayBuffer->new (-"inf");
+  };
+  like $@, qr{^RangeError: Byte length -.+ is negative at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
+  done $c;
+} n => 1, name => 'new negative';
+
+test {
+  my $c = shift;
+  eval {
+    ArrayBuffer->new (2**64);
+  };
+  like $@, qr{^RangeError: Byte length .+ is too large at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
+  done $c;
+} n => 1, name => 'new outside of range';
+
+test {
+  my $c = shift;
+  eval {
+    ArrayBuffer->new (0+"inf");
+  };
+  like $@, qr{^RangeError: Byte length .+ is too large at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
+  done $c;
+} n => 1, name => 'new outside of range';
 
 test {
   my $c = shift;

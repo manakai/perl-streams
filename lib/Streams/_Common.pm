@@ -28,10 +28,14 @@ sub _type_error ($) { $Streams::CreateTypeError->(undef, $_[0]) }
 sub _range_error ($) { $Streams::CreateRangeError->(undef, $_[0]) }
 push @EXPORT, qw(_type_error _range_error);
 
+## c.f. <http://search.cpan.org/~rjbs/perl-5.20.0/pod/perldelta.pod#Better_64-bit_support>
+my $MaxIndex = defined [0]->[2**32] ? 2**53-1 : 2**32-1;
+
 ## ToIndex for Perl
 sub _to_index ($$) {
   my $index = int $_[0];
   die _range_error "$_[1] $index is negative" if $index < 0;
+  die _range_error "$_[1] $index is too large" if $index > $MaxIndex;
   return $index;
 } # to_index
 push @EXPORT, qw(_to_index);
