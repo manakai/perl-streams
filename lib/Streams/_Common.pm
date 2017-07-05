@@ -36,6 +36,7 @@ sub _to_index ($$) {
   my $index = int $_[0];
   die _range_error "$_[1] $index is negative" if $index < 0;
   die _range_error "$_[1] $index is too large" if $index > $MaxIndex;
+  return 0 if $index eq 'nan' or $index eq 'NaN';
   return $index;
 } # to_index
 push @EXPORT, qw(_to_index);

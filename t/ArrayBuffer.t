@@ -64,6 +64,14 @@ test {
 
 test {
   my $c = shift;
+  my $ab = ArrayBuffer->new (0+"nan");
+  isa_ok $ab, 'ArrayBuffer';
+  is $ab->byte_length, 0;
+  done $c;
+} n => 2, name => 'new NaN';
+
+test {
+  my $c = shift;
   eval {
     ArrayBuffer->new (-32);
   };
