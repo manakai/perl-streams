@@ -27,9 +27,7 @@ sub new ($;$$$) {
       die _range_error 'The argument is not an ArrayBuffer or length';
     }
   } else {
-    ## ToIndex for Perl
-    $length = int $_[1];
-    die _range_error "Length $length is negative" if $length < 0;
+    $length = _to_index $_[1], 'Length';
   }
 
   if (defined $length) {
@@ -59,10 +57,7 @@ sub new ($;$$$) {
 
     my $element_size = $self->BYTES_PER_ELEMENT; ## Table->{ref $_[0]}
 
-    ## ToIndex for Perl
-    my $offset = int ($_[2] || 0);
-    die _range_error "Offset $offset is negative" if $offset < 0;
-
+    my $offset = _to_index $_[2] || 0, 'Offset';
     die _range_error "Offset $offset % element size $element_size != 0"
         unless ($offset % $element_size) == 0;
     die _type_error "ArrayBuffer is detached"
@@ -77,10 +72,10 @@ sub new ($;$$$) {
       die _range_error "Buffer length $buffer_byte_length < offset $offset"
           if $new_byte_length < 0;
     } else { # $length specified
-      my $new_length = 0+$_[3]; ## ToIndex
+      my $new_length = _to_index $_[3], 'Array length';
       $new_byte_length = $new_length * $element_size;
       die _range_error
-          "Buffer length $buffer_byte_length < offset $offset + length $new_length * element size $element_size"
+          "Buffer length $buffer_byte_length < offset $offset + array length $new_length * element size $element_size"
               if $offset + $new_byte_length > $buffer_byte_length;
     }
     $self->{viewed_array_buffer} = $_[1];
@@ -137,12 +132,13 @@ sub DESTROY ($) {
 
 package TypedArray::Uint8Array;
 push our @ISA, qw(TypedArray);
+use Streams::_Common;
 
 ## Not in JS
 sub new_by_sysread ($$) {
   my ($class, $fh, $byte_length) = @_;
   my $buffer = '';
-  my $bytes_read = sysread $fh, $buffer, $byte_length, 0;
+  my $bytes_read = sysread $fh, $buffer, (_to_index $byte_length, 'Byte length'), 0;
   die TypedArray::_type_error $! unless defined $bytes_read;
   return $class->new
       (ArrayBuffer->new_from_scalarref (\$buffer), 0, $bytes_read);

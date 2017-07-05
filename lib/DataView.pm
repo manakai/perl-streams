@@ -2,14 +2,7 @@ package DataView;
 use strict;
 use warnings;
 our $VERSION = '1.0';
-
-use ArrayBuffer;
-BEGIN {
-  *_type_error = \&ArrayBuffer::_type_error;
-  *_range_error = \&ArrayBuffer::_range_error;
-  *_not_supported_error = \&ArrayBuffer::_not_supported_error;
-}
-push our @CARP_NOT, qw(ArrayBuffer);
+use Streams::_Common;
 
 sub new ($$;$$) {
   my $self = bless {}, $_[0];
@@ -17,11 +10,7 @@ sub new ($$;$$) {
   my $buffer = $_[1];
   die _type_error "The argument is not an ArrayBuffer"
       unless defined $buffer and UNIVERSAL::isa ($buffer, 'ArrayBuffer'); ## has [[ArrayBufferData]]
-
-  ## ToIndex for Perl
-  my $offset = int ($_[2] || 0);
-  die _range_error "Offset $offset is negative" if $offset < 0;
-
+  my $offset = _to_index $_[2] || 0, 'Offset';
   die _type_error "ArrayBuffer is detached"
       if not defined $buffer->{array_buffer_data}; ## IsDetachedBuffer
   my $buffer_byte_length = $buffer->{array_buffer_byte_length};
@@ -29,11 +18,7 @@ sub new ($$;$$) {
       if $offset > $buffer_byte_length;
   my $view_byte_length;
   if (defined $_[3]) {
-    ## ToIndex for Perl
-    $view_byte_length = int $_[3];
-    die _range_error "Byte length $view_byte_length is negative"
-        if $view_byte_length < 0;
-
+    $view_byte_length = _to_index $_[3], 'Byte length';
     die _range_error
         "Offset $offset + length $view_byte_length > buffer length $buffer_byte_length"
             if $offset + $view_byte_length > $buffer_byte_length;

@@ -28,4 +28,12 @@ sub _type_error ($) { $Streams::CreateTypeError->(undef, $_[0]) }
 sub _range_error ($) { $Streams::CreateRangeError->(undef, $_[0]) }
 push @EXPORT, qw(_type_error _range_error);
 
+## ToIndex for Perl
+sub _to_index ($$) {
+  my $index = int $_[0];
+  die _range_error "$_[1] $index is negative" if $index < 0;
+  return $index;
+} # to_index
+push @EXPORT, qw(_to_index);
+
 1;

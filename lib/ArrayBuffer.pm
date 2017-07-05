@@ -10,10 +10,7 @@ use Streams::_Common;
 ## ArrayBuffer constructor
 sub new ($$) {
   my $self = bless {}, $_[0];
-
-  ## ToIndex for Perl
-  my $length = int $_[1];
-  die _range_error "Byte length $length is negative" if $length < 0;
+  my $length = _to_index $_[1], 'Byte length';
 
   ## AllocateArrayBuffer
   {

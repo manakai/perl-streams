@@ -168,6 +168,19 @@ for (
   test {
     my $c = shift;
     my $ab = ArrayBuffer->new (53);
+    my $ta = $class->new ($ab, 14, 8.9);
+    isa_ok $ta, $class;
+    is $ta->byte_length, 8;
+    is $ta->byte_offset, 14;
+    is $ta->length, 8;
+    is $ta->buffer, $ab;
+    is $ta->buffer->byte_length, 53;
+    done $c;
+  } n => 6, name => [$class, 'ArrayBuffer argument and offset and length'];
+
+  test {
+    my $c = shift;
+    my $ab = ArrayBuffer->new (53);
     $ab->_transfer; # detach
     eval {
       $class->new ($ab);
@@ -202,7 +215,7 @@ for (
     eval {
       $class->new ($ab, 50, 10);
     };
-    like $@, qr{^RangeError: Buffer length 53 < offset 50 \+ length 10 \* element size 1 at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
+    like $@, qr{^RangeError: Buffer length 53 < offset 50 \+ array length 10 \* element size 1 at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
     done $c;
   } n => 1, name => [$class, 'ArrayBuffer length too large'];
 
@@ -212,9 +225,19 @@ for (
     eval {
       $class->new ($ab, 60, 10);
     };
-    like $@, qr{^RangeError: Buffer length 53 < offset 60 \+ length 10 \* element size 1 at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
+    like $@, qr{^RangeError: Buffer length 53 < offset 60 \+ array length 10 \* element size 1 at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
     done $c;
   } n => 1, name => [$class, 'ArrayBuffer length too large'];
+
+  test {
+    my $c = shift;
+    my $ab = ArrayBuffer->new (53);
+    eval {
+      $class->new ($ab, 60, -10);
+    };
+    like $@, qr{^RangeError: Array length -10 is negative at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
+    done $c;
+  } n => 1, name => [$class, 'ArrayBuffer bad length'];
 
   test {
     my $c = shift;
@@ -246,6 +269,20 @@ test {
 
 test {
   my $c = shift;
+  open my $fh, '<', path (__FILE__)->parent->child ('TypedArray.t');
+  my $ta = TypedArray::Uint8Array->new_by_sysread ($fh, 0);
+  isa_ok $ta, 'TypedArray::Uint8Array';
+  is $ta->byte_length, 0;
+  is $ta->byte_offset, 0;
+  is $ta->length, $ta->byte_length;
+  is $ta->buffer->byte_length, $ta->byte_length;
+  my $ref = $ta->buffer->manakai_transfer_to_scalarref;
+  is $$ref, "";
+  done $c;
+} n => 6, name => 'new_by_sysread';
+
+test {
+  my $c = shift;
   my $path = path (__FILE__)->parent->child ('TypedArray.t');
   my $size = -s $path;
   open my $fh, '<', $path;
@@ -267,6 +304,19 @@ test {
   like $@, qr{^TypeError: .+ at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
   done $c;
 } n => 1, name => 'new_by_sysread fh error';
+
+test {
+  my $c = shift;
+  my $path = path (__FILE__)->parent->child ('TypedArray.t');
+  open my $fh, '<', $path;
+  eval {
+    TypedArray::Uint8Array->new_by_sysread ($fh, -10);
+  };
+  like $@, qr{^RangeError: Byte length -10 is negative at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
+  my $ta = TypedArray::Uint8Array->new_by_sysread ($fh, 10);
+  is ${$ta->buffer->manakai_transfer_to_scalarref}, 'use strict';
+  done $c;
+} n => 2, name => 'new_by_sysread';
 
 run_tests;
 
