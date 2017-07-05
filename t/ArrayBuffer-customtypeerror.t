@@ -6,7 +6,7 @@ use Test::More;
 use Test::X1;
 use ArrayBuffer;
 
-$ArrayBuffer::CreateTypeError = sub {
+$Streams::CreateTypeError = sub {
   return bless \"((TypeError: $_[1]))", 'test::package';
 };
 

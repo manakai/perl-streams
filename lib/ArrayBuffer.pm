@@ -2,23 +2,10 @@ package ArrayBuffer;
 use strict;
 use warnings;
 our $VERSION = '1.0';
-use Carp;
+use Streams::_Common;
 
 ## {array_buffer_data}'s value is a Data Block.  In Perl, it is
 ## represented as a reference to a byte string.
-
-$ArrayBuffer::CreateTypeError ||= sub ($$) {
-  return "TypeError: " . $_[1] . Carp::shortmess ();
-};
-$ArrayBuffer::CreateRangeError ||= sub ($$) {
-  return "RangeError: " . $_[1] . Carp::shortmess ();
-};
-$ArrayBuffer::CreateNotSupportedError ||= sub ($$) {
-  return "NotSupportedError: " . $_[1] . Carp::shortmess ();
-};
-sub _type_error ($) { $ArrayBuffer::CreateTypeError->(undef, $_[0]) }
-sub _range_error ($) { $ArrayBuffer::CreateRangeError->(undef, $_[0]) }
-sub _not_supported_error ($) { $ArrayBuffer::CreateNotSupportedError->(undef, $_[0]) }
 
 ## ArrayBuffer constructor
 sub new ($$) {

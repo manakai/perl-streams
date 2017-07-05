@@ -2,14 +2,8 @@ package TypedArray;
 use strict;
 use warnings;
 our $VERSION = '1.0';
-
+use Streams::_Common;
 use ArrayBuffer;
-BEGIN {
-  *_type_error = \&ArrayBuffer::_type_error;
-  *_range_error = \&ArrayBuffer::_range_error;
-  *_not_supported_error = \&ArrayBuffer::_not_supported_error;
-}
-push our @CARP_NOT, qw(ArrayBuffer);
 
 ## TypedArray ()
 ## TypedArray (length)
@@ -30,7 +24,7 @@ sub new ($;$$$) {
     if (UNIVERSAL::isa ($_[1], 'ArrayBuffer')) { ## has [[ArrayBufferData]]
       #
     } else {
-      die _not_supported_error 'The argument is not an ArrayBuffer or length';
+      die _range_error 'The argument is not an ArrayBuffer or length';
     }
   } else {
     ## ToIndex for Perl

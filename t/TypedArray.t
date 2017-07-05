@@ -96,7 +96,7 @@ for (
     eval {
       $class->new ({});
     };
-    like $@, qr{^NotSupportedError: The argument is not an ArrayBuffer or length at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
+    like $@, qr{^RangeError: The argument is not an ArrayBuffer or length at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
     done $c;
   } n => 1, name => [$class, 'bad argument'];
 
