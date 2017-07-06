@@ -41,4 +41,20 @@ sub _to_index ($$) {
 } # to_index
 push @EXPORT, qw(_to_index);
 
+sub _to_size ($$) {
+  ## ToNumber
+  my $size = 0+$_[0];
+
+  ## IsFiniteNonNegativeNumber
+  die _range_error "$_[1] $size is negative" if $size < 0;
+  die _range_error "$_[1] $size is too large" if $size eq 'Inf' or $size eq 'inf';
+
+  ## This is different from JS's IsFiniteNonNegativeNumber, to match
+  ## with Perl's convention.
+  return 0 if $size eq 'NaN' or $size eq 'nan';
+
+  return $size;
+} # _to_size
+push @EXPORT, qw(_to_size);
+
 1;
