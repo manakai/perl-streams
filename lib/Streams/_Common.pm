@@ -57,4 +57,27 @@ sub _to_size ($$) {
 } # _to_size
 push @EXPORT, qw(_to_size);
 
+# requires Promise
+sub _hashref_method_throws ($$$) {
+  ## InvokeOrNoop whose non-abrupt result is wrapped with a Promise
+  my $code = $_[0]->{$_[1]};
+  return Promise->resolve (undef) unless defined $code;
+  die _type_error "The |$_[1]| member is not a CODE" unless ref $code eq 'CODE';
+  my $result = $code->($_[0], @{$_[2]}); # or throws
+  return Promise->resolve ($result);
+} # _hashref_method_throws
+push @EXPORT, qw(_hashref_method_throws);
+
+# requires Promise
+sub _hashref_method ($$$) {
+  ## PromiseInvokeOrNoop
+  my $code = $_[0]->{$_[1]};
+  return Promise->resolve (undef) unless defined $code;
+  return Promise->reject (_type_error "The |$_[1]| member is not a CODE")
+      unless ref $code eq 'CODE';
+  my $args = [$_[0], @{$_[2]}];
+  return Promise->new (sub { $_[0]->(scalar $code->(@$args)) });
+} # _hashref_method
+push @EXPORT, qw(_hashref_method);
+
 1;
