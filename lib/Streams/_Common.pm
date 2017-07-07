@@ -57,6 +57,13 @@ sub _to_size ($$) {
 } # _to_size
 push @EXPORT, qw(_to_size);
 
+sub _promise_capability () {
+  my ($resolve, $reject);
+  my $promise = Promise->new (sub { ($resolve, $reject) = @_ });
+  return {promise => $promise, resolve => $resolve, reject => $reject};
+} # _promise_capability
+push @EXPORT, qw(_promise_capability);
+
 # requires Promise
 sub _hashref_method_throws ($$$) {
   ## InvokeOrNoop whose non-abrupt result is wrapped with a Promise
