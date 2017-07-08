@@ -369,7 +369,55 @@ test {
   my $ref2 = $ab2->manakai_transfer_to_scalarref;
   is $$ref2, "\x00\x00\x00\x00";
   done $c;
-} n =>2, name => '_clone not allocated';
+} n => 2, name => '_clone not allocated';
+
+test {
+  my $c = shift;
+  my $ab1 = ArrayBuffer->new (50);
+  my $ab2 = ArrayBuffer->new (30);
+  ArrayBuffer::_copy_data_block_bytes ($ab2, 6, $ab1, 3, 12);
+  is $ab1->byte_length, 50;
+  is $ab2->byte_length, 30;
+  is ${$ab1->manakai_transfer_to_scalarref}, "\x00" x 50;
+  is ${$ab2->manakai_transfer_to_scalarref}, "\x00" x 30;
+  done $c;
+} n => 4, name => '_copy_data_block_bytes not allocated -> not allocated';
+
+test {
+  my $c = shift;
+  my $ab1 = ArrayBuffer->new (50);
+  my $ab2 = ArrayBuffer->new_from_scalarref (\(my $v = "abetaEyewyaewewraeaetee"));
+  ArrayBuffer::_copy_data_block_bytes ($ab2, 6, $ab1, 3, 12);
+  is $ab1->byte_length, 50;
+  is $ab2->byte_length, 23;
+  is ${$ab1->manakai_transfer_to_scalarref}, "\x00" x 50;
+  is ${$ab2->manakai_transfer_to_scalarref}, "abetaE".("\x00" x 12)."aetee";
+  done $c;
+} n => 4, name => '_copy_data_block_bytes not allocated -> allocated';
+
+test {
+  my $c = shift;
+  my $ab1 = ArrayBuffer->new_from_scalarref (\(my $v = "abetaEyewyaewewraeaetee"));
+  my $ab2 = ArrayBuffer->new (50);
+  ArrayBuffer::_copy_data_block_bytes ($ab2, 3, $ab1, 6, 12);
+  is $ab1->byte_length, 23;
+  is $ab2->byte_length, 50;
+  is ${$ab1->manakai_transfer_to_scalarref}, "abetaEyewyaewewraeaetee";
+  is ${$ab2->manakai_transfer_to_scalarref}, "\x00\x00\x00"."yewyaewewrae".("\x00" x (50-15));
+  done $c;
+} n => 4, name => '_copy_data_block_bytes allocated -> not allocated';
+
+test {
+  my $c = shift;
+  my $ab1 = ArrayBuffer->new_from_scalarref (\(my $v = "abetaEyewyaewewraeaetee"));
+  my $ab2 = ArrayBuffer->new_from_scalarref (\(my $w = "3y74h5es4ytawgaeearaeeeeee"));
+  ArrayBuffer::_copy_data_block_bytes ($ab2, 3, $ab1, 6, 12);
+  is $ab1->byte_length, 23;
+  is $ab2->byte_length, 26;
+  is ${$ab1->manakai_transfer_to_scalarref}, "abetaEyewyaewewraeaetee";
+  is ${$ab2->manakai_transfer_to_scalarref}, "3y7yewyaewewraeeearaeeeeee";
+  done $c;
+} n => 4, name => '_copy_data_block_bytes allocated -> allocated';
 
 run_tests;
 

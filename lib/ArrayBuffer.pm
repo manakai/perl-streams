@@ -104,6 +104,29 @@ sub _clone ($$$$) {
   # XXX string copy counter for debugging
 } # _clone
 
+## CopyDataBlockBytes, invoked by Streams Standard operations, without
+## SharedArrayBuffer support.
+sub _copy_data_block_bytes ($$$$$) {
+  my ($dest_buffer, $dest_offset, $src_buffer, $src_offset, $byte_count) = @_;
+  if ($dest_buffer->{allocation_delayed}) {
+    my $new_buffer = ("\x00" x $dest_offset) . (
+     $src_buffer->{allocation_delayed}
+         ? "\x00" x $byte_count
+         : substr ${$src_buffer->{array_buffer_data}}, $src_offset, $byte_count
+    ) . ("\x00" x ($dest_buffer->{array_buffer_byte_length} - $byte_count - $dest_offset));
+    delete $dest_buffer->{allocation_delayed};
+    $dest_buffer->{array_buffer_data} = \$new_buffer;
+  } else { # $dest allocated
+    if ($src_buffer->{allocation_delayed}) {
+      substr (${$dest_buffer->{array_buffer_data}}, $dest_offset, $byte_count)
+          = "\x00" x $byte_count;
+    } else {
+      substr (${$dest_buffer->{array_buffer_data}}, $dest_offset, $byte_count)
+          = substr ${$src_buffer->{array_buffer_data}}, $src_offset, $byte_count;
+    }
+  }
+} # _copy_data_block_bytes
+
 sub byte_length ($) {
   my $self = $_[0];
   die _type_error ('ArrayBuffer is detached')
