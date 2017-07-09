@@ -1,0 +1,186 @@
+=head1 NAME
+
+WritableStream - Writing API for chunked data stream
+
+=head1 SYNOPSIS
+
+  use WritableStream;
+  $ws = WritableStream->new ({
+    start => sub {
+      # initialization
+    },
+    write => sub {
+      write $_[1];
+    },
+  });
+  $writer = $ws->get_writer;
+  $writer->write ($chunk);
+  $writer->close;
+
+=head1 DESCRIPTION
+
+The C<WritableStream> module provides API for writing chunked data
+stream.
+
+This module is intended to be equivalent to JavaScript
+C<WritableStream> API, as specified by WHATWG Streams Standard, except
+for several edge cases where JavaScript and Perl have different
+conventions.
+
+=head1 METHODS
+
+Following methods are available:
+
+=over 4
+
+=item $ws = WritableStream->new ($sink[, $strategy])
+
+Create and return a new L<WritableStream>.
+
+The first argument I<$sink> must be a hash reference with following
+key/value pairs:
+
+=over 4
+
+=item start => CODE
+
+A code reference which is invoked B<synchronously> within the C<new>
+method.
+
+The code is invoked with two arguments: I<$sink>, I<$controller>.
+
+The code can return a promise which is resolved when it is ready to
+accept chunks.
+
+=item write => CODE
+
+A code reference which is asynchronously invoked when the stream
+receives a new chunk.
+
+The code is invoked with three arguments: I<$sink>, the received chunk
+(i.e. an argument to the C<write> method of the writer),
+I<$controller>.
+
+The code can return a promise which is resolved once the chunk is
+written.  It may be rejected if the write operation failed and the
+stream can no longer be used.
+
+=item close => CODE
+
+A code reference which is asynchronously invoked when the stream is
+closed, if any, or C<undef>.
+
+The code is invoked with an argument: I<$sink>.
+
+The code can return a promise which is resolved once the stream's
+underlying channel is closed.  It may be rejected if it cannot be
+successfully closed.
+
+This code is not invoked when the C<abort> code is invoked.
+
+=item abort => CODE
+
+A code reference which is asynchronously invoked when the stream is
+aborted.
+
+The code is invoked with arguments: I<$sink>, the reason (i.e.  an
+exception object describing the error).
+
+The code can return a promise.
+
+This code is not invoked when the C<close> code is invoked.
+
+=back
+
+The second argument must be a strategy or C<undef>.
+
+The C<start> and C<write> codes receive the B<controller> object
+I<$controller>, which has following method:
+
+=over 4
+
+=item $controller->error ($reason)
+
+Invalidate the stream.  The argument is the error reason, i.e. an
+exception object describing the error (it can be any Perl value).
+
+=back
+
+=item $writer = $ws->get_writer
+
+Create and return a new writer for the stream.
+
+The writer object has following methods:
+
+=over 4
+
+=item $promise = $writer->ready
+
+Return a promise (L<Promise>) which is resolved when the stream is
+ready to accept chunks.
+
+=item $promise = $writer->write ($chunk)
+
+Write a chunk to the stream.  The argument is the chunk.  It can be
+any Perl value.  The method returns a promise (L<Promise>) which is
+resolved when the chunk is written.
+
+=item $number = $writer->desired_size
+
+Return the number of chunks that should be written to the stream.
+
+=item $promise = $writer->close
+
+Close the stream.  It returns a promise (L<Promise>) which is resolved
+when the stream is closed.
+
+=item $writer->abort ($reason)
+
+Cancel the stream.  The argument is the error reason, i.e. an
+exception object describing the error (it can be any Perl value).
+
+=item $promise = $writer->closed
+
+Return a promise (L<Promise>) which is resolved when the stream is
+closed.  It is fulfilled or rejected depending on how the stream is
+closed.
+
+=item $writer->release_lock
+
+Detach the writer from the stream.  Once detached, the writer can no
+longer be used.
+
+=back
+
+=item $boolean = $ws->locked
+
+Return whether the stream is locked (i.e. there is an active writer
+for the stream) or not.
+
+=item $ws->abort ($reason)
+
+Cancel the stream.  The argument is the error reason, i.e. an
+exception object describing the error (it can be any Perl value).
+
+This method cannot be used if the stream is locked.
+
+=back
+
+=head1 SEE ALSO
+
+L<ReadableStream>.
+
+Streams Standard <https://streams.spec.whatwg.org/>.
+
+=head1 AUTHOR
+
+Wakaba <wakaba@suikawiki.org>.
+
+=head1 LICENSE
+
+Copyright 2017 Wakaba <wakaba@suikawiki.org>.
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut

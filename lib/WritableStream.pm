@@ -655,8 +655,6 @@ sub DESTROY ($) {
 
 1;
 
-# XXX documentation
-
 =head1 LICENSE
 
 Copyright 2017 Wakaba <wakaba@suikawiki.org>.

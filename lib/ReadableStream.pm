@@ -9,6 +9,42 @@ use DataView;
 use Promise;
 use Streams::_Common;
 
+## In JS (Streams Standard specification text), stream and controller
+## are referencing each other by their internal slots:
+##
+##   stream.[[ReadableStreamController]] === controller
+##   controller.[[ControlledReadableStream]] === stream
+##
+## In this module, a $stream is a blessed hash reference whose
+## |readable_stream_controller| is a non-blessed hash reference
+## containing controller's internal slots (except for
+## [[ControlledReadableStream]]).  A $controller_obj is a blessed
+## scalar reference to $stream.  $stream->{controller_obj} is a weak
+## reference to $controller_obj.  $controller_obj is used when
+## $underlying_sink methods are invoked.  If $stream->{controller_obj}
+## is not defined, a new blessed scalar reference is created.
+##
+## Likewise, stream and reader are referencing each other in JS when
+## there is a reader whose lock is not released:
+##
+##   stream.[[Reader]] === reader
+##   reader.[[OwnerReadableStream]] === stream
+##
+## In this module, a $reader is a blessed scalar reference to $stream
+## whose |reader| is a non-blessed hash reference containing reader's
+## internal slots (except for [[OwnerReadableStream]]).  When the
+## $reader's lock is released, $$reader is replaced by a new hash
+## reference whose |reader| is $reader's hash reference (and
+## $stream->{reader} is set to |undef|).
+##
+## A BYOB request object is represented as a blessed scalar reference
+## to $stream whose |controller|'s |byob_request| is a non-blessed
+## hash reference containing request's internal slots (except for
+## [[AssociatedReadableStreamController]]) and |byob_request_obj| is
+## weak reference to a BYOB request object.  When the request is
+## invalidated, $$request is replaced by a new hash reference whose
+## |controller| whose |byob_request| is $request's hash reference.
+
 sub new ($;$$) {
   die _type_error "Source is not a HASH"
       if defined $_[1] and not ref $_[1] eq 'HASH'; # Not in JS

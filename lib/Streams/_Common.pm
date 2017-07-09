@@ -88,3 +88,12 @@ sub _hashref_method ($$$) {
 push @EXPORT, qw(_hashref_method);
 
 1;
+
+=head1 LICENSE
+
+Copyright 2017 Wakaba <wakaba@suikawiki.org>.
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut
