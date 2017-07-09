@@ -83,7 +83,7 @@ This code is not invoked when the C<abort> code is invoked.
 A code reference which is asynchronously invoked when the stream is
 aborted.
 
-The code is invoked with arguments: I<$sink>, the reason (i.e.  an
+The code is invoked with arguments: I<$sink>, the reason (i.e. an
 exception object describing the error).
 
 The code can return a promise.
@@ -92,7 +92,7 @@ This code is not invoked when the C<close> code is invoked.
 
 =back
 
-The second argument must be a strategy or C<undef>.
+The second argument must be a queuing strategy or C<undef>.
 
 The C<start> and C<write> codes receive the B<controller> object
 I<$controller>, which has following method:

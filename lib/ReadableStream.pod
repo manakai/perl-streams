@@ -1,0 +1,244 @@
+=head1 NAME
+
+ReadableStream - Reading API for chunked data stream
+
+=head1 SYNOPSIS
+
+  use ReadableStream;
+  $ws = ReadableStream->new ({
+    start => sub {
+      # initialization
+    },
+    pull => sub {
+      $_[1]->enqueue ($chunk);
+      $_[1]->close;
+    },
+  });
+  $reader = $rs->get_reader;
+  $reader->read->then (sub {
+    my $v = $_[0];
+    warn $v->{done} ? "End" : $v->{value};
+  });
+
+=head1 DESCRIPTION
+
+The C<ReadableStream> module provides API for reading chunked data
+stream.
+
+This module is intended to be equivalent to JavaScript
+C<ReadableStream> API, as specified by WHATWG Streams Standard, except
+for several edge cases where JavaScript and Perl have different
+conventions.
+
+=head1 METHODS
+
+Following methods are available:
+
+=over 4
+
+=item $rs = ReadableStream->new ($sink[, $strategy])
+
+Create and return a new L<ReadableStream>.
+
+The first argument I<$source> must be a hash reference with following
+key/value pairs:
+
+=over 4
+
+=item type => "bytes" or undef
+
+If the string C<bytes> is specified, a readable byte stream is
+created.  If no C<type> is specified, a generic readable stream is
+created.
+
+=item start => CODE
+
+A code reference which is invoked B<synchronously> within the C<new>
+method.
+
+The code is invoked with two arguments: I<$source>, I<$controller>.
+
+The code can perform the read operation by using I<$controller>'s
+methods, either directly or indirectly.
+
+The code can return a promise which is resolved when it is ready to
+accept read requests.
+
+=item pull => CODE
+
+A code reference which is asynchronously invoked when a new chunk is
+expected.
+
+The code is invoked with two arguments: I<$source>, I<$controller>.
+
+The read operation is expected to be done by using I<$controller>'s
+methods, either directly or indirectly by the code.
+
+The code can return a promise.  It may be rejected if the read
+operation failed and the stream can no longer be used.
+
+=item cancel => CODE
+
+A code reference which is asynchronously invoked when the stream is
+aborted.
+
+The code is invoked with arguments: I<$source>, the reason (i.e. an
+exception object describing the error).
+
+The code can return a promise.
+
+=item auto_allocate_chunk_size => $integer or undef
+
+The chunk size of the buffer used when C<type> is C<bytes> and
+auto-allocation happens.  If specified, the value must be a positive
+integer.  If the value is not defined, no auto-allocation is done.
+
+=back
+
+The second argument must be a queuing strategy or C<undef>.
+
+The C<start> and C<pull> codes receive the B<controller> object
+I<$controller>, which has following method:
+
+=over 4
+
+=item $controller->enqueue ($chunk)
+
+Enqueue a chunk to the stream.  The argument is a chunk.
+
+If the stream is a readable byte stream, the chunk must be an
+ArrayBufferView (L<TypedArray> or L<DataView>).  Otherwise, it can be
+any Perl value.
+
+=item $number = $controller->desired_size
+
+Return the number of chunks that should be enqueued to the stream.
+
+=item $byob_request = $controller->byob_request (readable byte stream only)
+
+Return the current read request from the BYOB reader, if any.  If no
+request is available, the method returns C<undef>.
+
+If there is a request from the BYOB reader to read a chunk of bytes,
+the request object with following methods are returned:
+
+=over 4
+
+=item $view = $byob_request->view
+
+The ArrayBufferView (L<TypedArray> or L<DataView>) to which the bytes
+should be written into.
+
+=item $byob_request->respond ($byte_length)
+
+Notify that the bytes are written into the view returned by C<<
+$byob_request->view >> (from the location C<<
+$byob_request->view->byte_offset >>).  The argument must be the number
+of the bytes written.
+
+=item $byob_request->respond_with_new_view ($view)
+
+Notify that the bytes are written into a view with same offset and
+length as C<< $byob_request >> but is different view object.  The
+argument must be an ArrayBufferView (L<TypedArray> or L<DataView>).
+
+=back
+
+=item $controller->close
+
+Close the stream.
+
+=item $controller->error ($reason)
+
+Invalidate the stream.  The argument is the error reason, i.e. an
+exception object describing the error (it can be any Perl value).
+
+=back
+
+=item $reader = $rs->get_reader ($type)
+
+Create and return a new reader for the stream.
+
+If the first argument is a string C<byob>, a BYOB reader is created.
+If no argument is specified, a generic reader is created.
+
+A BYOB reader can be used to efficiently read a byte sequence.  To
+create a BYOB reader, the stream must be a readable byte stream.
+
+The reader object has following methods:
+
+=over 4
+
+=item $reader->read ($view)->then (sub { $_[0]->{value}, $_[0]->{done} })
+
+Read a chunk from the stream.
+
+If the reader is a BYOB reader, the argument must be an
+ArrayBufferView (L<ArrayBufferView> or L<DataView>).  Otherwise,
+nothing need to be specified.
+
+It returns a promise (L<Promise>) which is to be fulfilled with the
+result, or rejected with an error.
+
+If the read request has fulfilled and there is a chunk available, the
+promise is resolved with a hash reference whose C<value> is the chunk
+and C<done> is false.
+
+If the reader is a BYOB reader, the value is an ArrayBufferView with
+same class as the I<$view> argument.  (Note that I<$view> is detached
+and can no longer be used.)
+
+If the read request has fulfilled but there is no more chunk, the
+promise is resolved with a hash reference whose C<value> is not
+defined and C<done> is true.
+
+=item $reader->cancel ($reason)
+
+Cancel the stream.  The argument is the error reason, i.e. an
+exception object describing the error (it can be any Perl value).
+
+=item $promise = $reader->closed
+
+Return a promise (L<Promise>) which is resolved when the stream is
+closed.  It is fulfilled or rejected depending on how the stream is
+closed.
+
+=item $reader->release_lock
+
+Detach the reader from the stream.  Once detached, the reader can no
+longer be used.
+
+=back
+
+=item $boolean = $rs->locked
+
+Return whether the stream is locked (i.e. there is an active reader
+for the stream) or not.
+
+=item $rs->abort ($reason)
+
+Cancel the stream.  The argument is the error reason, i.e. an
+exception object describing the error (it can be any Perl value).
+
+This method cannot be used if the stream is locked.
+
+=back
+
+=head1 SEE ALSO
+
+L<WritableStream>.
+
+Streams Standard <https://streams.spec.whatwg.org/>.
+
+=head1 AUTHOR
+
+Wakaba <wakaba@suikawiki.org>.
+
+=head1 LICENSE
+
+Copyright 2017 Wakaba <wakaba@suikawiki.org>.
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut
