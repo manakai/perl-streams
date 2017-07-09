@@ -4,6 +4,7 @@ use Path::Tiny;
 use lib glob path (__FILE__)->parent->parent->child ('t_deps/modules/*/lib');
 use Test::More;
 use Test::X1;
+use Promised::Flow;
 use WritableStream;
 
 test {
@@ -702,6 +703,8 @@ test {
     $ws->{_destroy} = bless sub { $destroyed = 1 }, 'test::DestroyCallback1';
   }
   Promise->resolve->then (sub {
+    return promised_wait_until { $destroyed } timeout => 10;
+  })->then (sub {
     test {
       ok $destroyed;
       done $c;
@@ -757,6 +760,25 @@ test {
     } $c;
   });
 } n => 1, name => 'destroy';
+
+test {
+  my $c = shift;
+  my $result = '';
+  my $ws = WritableStream->new ({
+    write => sub { $result .= $_[1] },
+  });
+  my $w = $ws->get_writer;
+  undef $ws;
+  $w->write ("abc");
+  $w->write ("def");
+  $w->close->then (sub {
+    test {
+      is $result, "abcdef";
+    } $c;
+    done $c;
+    undef $c;
+  });
+} n => 1, name => 'WritableStream reference discarded before write';
 
 run_tests;
 

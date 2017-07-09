@@ -89,10 +89,11 @@ sub ReadableStream::_close ($) {
   if (defined $reader) {
     if (defined $reader->{read_requests}) { # IsReadableStreamDefaultReader
       for my $read_request (@{$reader->{read_requests}}) {
-        $read_request->{resolve}->({done => 1});
+        $read_request->{promise}->{resolve}->({done => 1});
       }
       $reader->{read_requests} = [];
     }
+
     $reader->{closed_promise}->{resolve}->(undef);
   }
 } # ReadableStreamClose

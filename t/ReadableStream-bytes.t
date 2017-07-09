@@ -6,6 +6,7 @@ use Test::More;
 use Test::X1;
 use ReadableStream;
 use Promise;
+use Promised::Flow;
 use ArrayBuffer;
 use TypedArray;
 
@@ -482,6 +483,184 @@ test {
     undef $c;
   });
 } n => 2, name => 'byob_request different objects';
+
+{
+  package test::DestroyCallback1;
+  sub DESTROY {
+    $_[0]->();
+  }
+}
+
+test {
+  my $c = shift;
+  my $destroyed;
+  {
+    my $rs = ReadableStream->new ({
+      type => 'bytes',
+    });
+    $rs->{_destroy} = bless sub { $destroyed = 1 }, 'test::DestroyCallback1';
+  }
+  Promise->resolve->then (sub {
+    return promised_wait_until { $destroyed } timeout => 10;
+  })->then (sub {
+    test {
+      ok $destroyed;
+      done $c;
+      undef $c;
+    } $c;
+  });
+} n => 1, name => 'destroy';
+
+test {
+  my $c = shift;
+  my $p;
+  my $destroyed;
+  {
+    my $rc;
+    my @read = map { DataView->new (ArrayBuffer->new_from_scalarref (\$_)) } ("abc", "def");
+    my $rs = ReadableStream->new ({
+      type => 'bytes',
+      start => sub { $rc = $_[1] },
+      pull => sub { $_[1]->enqueue (shift @read || (return $_[1]->close)) },
+    });
+    $rs->{_destroy} = bless sub { $destroyed = 1 }, 'test::DestroyCallback1';
+    my $r = $rs->get_reader ('byob');
+    $p = $r->read (DataView->new (ArrayBuffer->new (3)));
+    Promise->resolve->then (sub {
+      undef $rc; # need explicit freeing!
+    });
+  }
+  Promise->resolve ($p)->then (sub {
+    return promised_wait_until { $destroyed } timeout => 10;
+  })->then (sub {
+    test {
+      ok $destroyed;
+      done $c;
+      undef $c;
+    } $c;
+  });
+} n => 1, name => 'destroy';
+
+test {
+  my $c = shift;
+  my $p;
+  my $destroyed;
+  {
+    my $rc;
+    my @read = map { DataView->new (ArrayBuffer->new_from_scalarref (\$_)) } ("abc", "def");
+    my $rs = ReadableStream->new ({
+      type => 'bytes',
+      start => sub { $rc = $_[1] },
+      pull => sub { $_[1]->enqueue (shift @read || (return $_[1]->close)) },
+    });
+    $rs->{_destroy} = bless sub { $destroyed = 1 }, 'test::DestroyCallback1';
+    my $r = $rs->get_reader ('byob');
+    $r->read (DataView->new (ArrayBuffer->new (3)));
+    $rc->close;
+    $p = $r->closed;
+  }
+  Promise->resolve ($p)->then (sub {
+    test {
+      ok $destroyed;
+      done $c;
+      undef $c;
+    } $c;
+  });
+} n => 1, name => 'destroy';
+
+test {
+  my $c = shift;
+  my @read = map { DataView->new (ArrayBuffer->new_from_scalarref (\$_)) } ("abc", "def");
+  my $rs = ReadableStream->new ({
+    type => 'bytes',
+    pull => sub { $_[1]->enqueue (shift @read || (return $_[1]->close)) },
+  });
+  my $r = $rs->get_reader ('byob');
+  undef $rs;
+  my $result = '';
+  $r->read (DataView->new (ArrayBuffer->new (3)))->then (sub {
+    $result .= ${$_[0]->{value}->buffer->manakai_transfer_to_scalarref};
+  })->then (sub {
+    return $r->read (DataView->new (ArrayBuffer->new (3)));
+  })->then (sub {
+    $result .= ${$_[0]->{value}->buffer->manakai_transfer_to_scalarref};
+  })->then (sub {
+    return $r->read (DataView->new (ArrayBuffer->new (3)));
+  });
+  $r->closed->then (sub {
+    test {
+      is $result, "abcdef";
+    } $c;
+  }, sub {
+    test { ok 0 } $c;
+  })->then (sub {
+    done $c;
+    undef $c;
+  });
+} n => 1, name => 'ReadableStream reference discarded before read 1';
+
+test {
+  my $c = shift;
+  my @read = map { DataView->new (ArrayBuffer->new_from_scalarref (\$_)) } ("abc", "def");
+  my $rs = ReadableStream->new ({
+    type => 'bytes',
+    pull => sub {
+      $_[1]->enqueue ($_) for @read;
+      return $_[1]->close;
+    },
+  });
+  my $r = $rs->get_reader ('byob');
+  undef $rs;
+  my $result = '';
+  $r->read (DataView->new (ArrayBuffer->new (3)))->then (sub {
+    $result .= ${$_[0]->{value}->buffer->manakai_transfer_to_scalarref};
+  })->then (sub {
+    return $r->read (DataView->new (ArrayBuffer->new (3)));
+  })->then (sub {
+    $result .= ${$_[0]->{value}->buffer->manakai_transfer_to_scalarref};
+  })->then (sub {
+    return $r->read (DataView->new (ArrayBuffer->new (3)));
+  })->then (sub {
+    $result .= $_[0]->{done} ? 1 : 0;
+    return $r->closed;
+  })->then (sub {
+    test {
+      is $result, "abcdef1";
+    } $c;
+  }, sub {
+    test { ok 0 } $c;
+  })->then (sub {
+    done $c;
+    undef $c;
+  });
+} n => 1, name => 'ReadableStream reference discarded before read 2';
+
+test {
+  my $c = shift;
+  my @read = map { DataView->new (ArrayBuffer->new_from_scalarref (\$_)) } ("abc", "def");
+  my $rs = ReadableStream->new ({
+    type => 'bytes',
+    pull => sub {
+      $_[1]->enqueue ($_) for @read;
+      return $_[1]->close;
+    },
+  });
+  my $r = $rs->get_reader ('byob');
+  undef $rs;
+  my $result = '';
+  $r->read (DataView->new (ArrayBuffer->new (3)))->then (sub { $result .= ${$_[0]->{value}->buffer->manakai_transfer_to_scalarref} });
+  $r->read (DataView->new (ArrayBuffer->new (3)))->then (sub { $result .= ${$_[0]->{value}->buffer->manakai_transfer_to_scalarref} });
+  $r->closed->then (sub {
+    test {
+      is $result, "abcdef";
+    } $c;
+  }, sub {
+    test { ok 0 } $c;
+  })->then (sub {
+    done $c;
+    undef $c;
+  });
+} n => 1, name => 'ReadableStream reference discarded before read';
 
 run_tests;
 

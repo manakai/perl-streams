@@ -4,6 +4,7 @@ use Path::Tiny;
 use lib glob path (__FILE__)->parent->parent->child ('t_deps/modules/*/lib');
 use Test::More;
 use Test::X1;
+use Promised::Flow;
 use ReadableStream;
 
 test {
@@ -598,6 +599,106 @@ test {
   ok $rs->get_reader;
   done $c;
 } n => 2, name => 'get_reader';
+
+{
+  package test::DestroyCallback1;
+  sub DESTROY {
+    $_[0]->();
+  }
+}
+
+test {
+  my $c = shift;
+  my $destroyed;
+  {
+    my $rs = ReadableStream->new;
+    $rs->{_destroy} = bless sub { $destroyed = 1 }, 'test::DestroyCallback1';
+  }
+  Promise->resolve->then (sub {
+    return promised_wait_until { $destroyed } timeout => 10;
+  })->then (sub {
+    test {
+      ok $destroyed;
+      done $c;
+      undef $c;
+    } $c;
+  });
+} n => 1, name => 'destroy';
+
+test {
+  my $c = shift;
+  my $p;
+  my $destroyed;
+  {
+    my $rc;
+    my @read = ("abc", "def");
+    my $rs = ReadableStream->new ({
+      start => sub { $rc = $_[1] },
+      pull => sub { $_[1]->enqueue (shift @read || (return $_[1]->close)) },
+    });
+    $rs->{_destroy} = bless sub { $destroyed = 1 }, 'test::DestroyCallback1';
+    my $r = $rs->get_reader;
+    $p = $r->read;
+    Promise->resolve->then (sub {
+      undef $rc; # need explicit freeing!
+    });
+  }
+  Promise->resolve ($p)->then (sub {
+    return promised_wait_until { $destroyed } timeout => 10;
+  })->then (sub {
+    test {
+      ok $destroyed;
+      done $c;
+      undef $c;
+    } $c;
+  });
+} n => 1, name => 'destroy';
+
+test {
+  my $c = shift;
+  my $p;
+  my $destroyed;
+  {
+    my $rc;
+    my @read = ("abc", "def");
+    my $rs = ReadableStream->new ({
+      start => sub { $rc = $_[1] },
+      pull => sub { $_[1]->enqueue (shift @read || (return $_[1]->close)) },
+    });
+    $rs->{_destroy} = bless sub { $destroyed = 1 }, 'test::DestroyCallback1';
+    my $r = $rs->get_reader;
+    $r->read;
+    $rc->close;
+    $p = $r->closed;
+  }
+  Promise->resolve ($p)->then (sub {
+    test {
+      ok $destroyed;
+      done $c;
+      undef $c;
+    } $c;
+  });
+} n => 1, name => 'destroy';
+
+test {
+  my $c = shift;
+  my @read = ("abc", "def");
+  my $rs = ReadableStream->new ({
+    pull => sub { $_[1]->enqueue (shift @read || (return $_[1]->close)) },
+  });
+  my $r = $rs->get_reader;
+  undef $rs;
+  my $result = '';
+  $r->read->then (sub { $result .= $_[0]->{value} });
+  $r->read->then (sub { $result .= $_[0]->{value} });
+  $r->closed->then (sub {
+    test {
+      is $result, "abcdef";
+    } $c;
+    done $c;
+    undef $c;
+  });
+} n => 1, name => 'ReadableStream reference discarded before read';
 
 run_tests;
 
