@@ -2,6 +2,7 @@ package WritableStream;
 use strict;
 use warnings;
 our $VERSION = '1.0';
+use Carp;
 use Promise;
 use Streams::_Common;
 
@@ -10,7 +11,9 @@ sub new ($;$$) {
       if defined $_[1] and not ref $_[1] eq 'HASH'; # Not in JS
   die _type_error "Options is not a HASH"
       if defined $_[2] and not ref $_[2] eq 'HASH'; # Not in JS
-  my $self = bless {}, $_[0];
+  my $self = bless {
+    created_location => Carp::shortmess,
+  }, $_[0];
   my $underlying_sink = $_[1] || {};
   my $opts = $_[2] || {high_water_mark => 1};
   die _range_error "Unknown type |$underlying_sink->{type}|"
@@ -274,6 +277,16 @@ sub WritableStreamDefaultController::_advance_queue_if_needed ($) {
   }
 } # WritableStreamDefaultControllerAdvanceQueueIfNeeded
 
+sub DESTROY ($) {
+  local $@;
+  eval { die };
+  if ($@ =~ /during global destruction/) {
+    my $location = $_[0]->{created_location};
+    $location =~ s/\.?\s+\z//;
+    warn "$$: Reference to @{[ref $_[0]]} created${location} is not discarded before global destruction\n";
+  }
+} # DESTROY
+
 package WritableStreamDefaultWriter;
 use Streams::_Common;
 push our @CARP_NOT, qw(WritableStream);
@@ -483,6 +496,14 @@ sub write ($$) {
   return $pc->{promise};
 } # write(chunk)
 
+sub DESTROY ($) {
+  local $@;
+  eval { die };
+  if ($@ =~ /during global destruction/) {
+    warn "$$: Reference to @{[ref $_[0]]} is not discarded before global destruction\n";
+  }
+} # DESTROY
+
 package WritableStreamDefaultController;
 use Streams::_Common;
 push our @CARP_NOT, qw(WritableStream);
@@ -551,10 +572,17 @@ sub _error_steps ($) {
   $_[0]->{queue_total_size} = 0;
 } # [[ErrorSteps]]
 
+sub DESTROY ($) {
+  local $@;
+  eval { die };
+  if ($@ =~ /during global destruction/) {
+    warn "$$: Reference to @{[ref $_[0]]} is not discarded before global destruction\n";
+  }
+} # DESTROY
+
 1;
 
 # XXX documentation
-# XXX DESTROY
 # XXX loop
 
 =head1 LICENSE
