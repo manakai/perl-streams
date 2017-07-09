@@ -13,7 +13,9 @@ sub new ($;$$) {
       if defined $_[1] and not ref $_[1] eq 'HASH'; # Not in JS
   die _type_error "Options is not a HASH"
       if defined $_[2] and not ref $_[2] eq 'HASH'; # Not in JS
-  my $self = bless {}, $_[0];
+  my $self = bless {
+    created_location => Carp::shortmess,
+  }, $_[0];
   my $underlying_source = $_[1] || {};
   my $opts = $_[2] || {};
   $self->{state} = 'readable';
@@ -93,6 +95,16 @@ sub get_reader ($;$) {
 # $rs->pipe_to pipe_through tee
 
 ## XXX IsReadableStreamDisturbed hook
+
+sub DESTROY ($) {
+  local $@;
+  eval { die };
+  if ($@ =~ /during global destruction/) {
+    my $location = $_[0]->{created_location};
+    $location =~ s/\.?\s+\z//;
+    warn "$$: Reference to @{[ref $_[0]]} created${location} is not discarded before global destruction\n";
+  }
+} # DESTROY
 
 package ReadableStreamDefaultController;
 use Streams::_Common;
@@ -331,6 +343,14 @@ sub _pull_steps ($) {
   ReadableStreamDefaultController::_call_pull_if_needed $stream;
   return $p->{promise};
 } # [[PullSteps]]
+
+sub DESTROY ($) {
+  local $@;
+  eval { die };
+  if ($@ =~ /during global destruction/) {
+    warn "$$: Reference to @{[ref $_[0]]} is not discarded before global destruction\n";
+  }
+} # DESTROY
 
 package ReadableByteStreamController;
 use Streams::_Common;
@@ -717,6 +737,14 @@ sub _pull_steps ($) {
   return $p->{promise};
 } # [[PullSteps]
 
+sub DESTROY ($) {
+  local $@;
+  eval { die };
+  if ($@ =~ /during global destruction/) {
+    warn "$$: Reference to @{[ref $_[0]]} is not discarded before global destruction\n";
+  }
+} # DESTROY
+
 package ReadableStreamBYOBRequest;
 use Streams::_Common;
 push our @CARP_NOT, qw(ReadableStream);
@@ -870,6 +898,14 @@ sub manakai_respond_with_new_view ($$) {
   return undef;
 } # manakai_respond_with_new_value
 
+sub DESTROY ($) {
+  local $@;
+  eval { die };
+  if ($@ =~ /during global destruction/) {
+    warn "$$: Reference to @{[ref $_[0]]} is not discarded before global destruction\n";
+  }
+} # DESTROY
+
 package ReadableStreamDefaultReader;
 use Streams::_Common;
 push our @CARP_NOT, qw(ReadableStream);
@@ -943,6 +979,14 @@ sub release_lock ($) {
 
   return undef;
 } # releaseLock
+
+sub DESTROY ($) {
+  local $@;
+  eval { die };
+  if ($@ =~ /during global destruction/) {
+    warn "$$: Reference to @{[ref $_[0]]} is not discarded before global destruction\n";
+  }
+} # DESTROY
 
 package ReadableStreamBYOBReader;
 use Streams::_Common;
@@ -1093,4 +1137,23 @@ sub release_lock ($) {
   return undef;
 } # releaseLock
 
+sub DESTROY ($) {
+  local $@;
+  eval { die };
+  if ($@ =~ /during global destruction/) {
+    warn "$$: Reference to @{[ref $_[0]]} is not discarded before global destruction\n";
+  }
+} # DESTROY
+
 1;
+
+# XXX documentation
+
+=head1 LICENSE
+
+Copyright 2017 Wakaba <wakaba@suikawiki.org>.
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut
