@@ -434,6 +434,53 @@ test {
   done $c;
 } n => 1, name => 'start is not CODE';
 
+test {
+  my $c = shift;
+  my $rs = ReadableStream->new ({
+    type => 'bytes',
+    pull => sub {
+      my $rc = $_[1];
+      test {
+        my $req1 = $rc->byob_request;
+        isa_ok $req1, 'ReadableStreamBYOBRequest';
+        my $req2 = $rc->byob_request;
+        isa_ok $req2, 'ReadableStreamBYOBRequest';
+        is $req2, $req1;
+      } $c;
+    },
+  });
+  my $view = DataView->new (ArrayBuffer->new (2));
+  $rs->get_reader ('byob')->read ($view);
+  Promise->resolve->then (sub {
+    done $c;
+    undef $c;
+  });
+} n => 3, name => 'byob_request same objects';
+
+test {
+  my $c = shift;
+  my @req;
+  my $rs = ReadableStream->new ({
+    type => 'bytes',
+    pull => sub {
+      my $rc = $_[1];
+      push @req, $rc->byob_request;
+      $req[-1]->respond (2);
+    },
+  });
+  my $r = $rs->get_reader ('byob');
+  $r->read (DataView->new (ArrayBuffer->new (2)))->then (sub {
+    return $r->read (DataView->new (ArrayBuffer->new (2)));
+  })->then (sub {
+    test {
+      is 0+@req, 2;
+      isnt $req[0], $req[1];
+    } $c;
+    done $c;
+    undef $c;
+  });
+} n => 2, name => 'byob_request different objects';
+
 run_tests;
 
 =head1 LICENSE

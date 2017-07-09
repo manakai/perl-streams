@@ -385,9 +385,13 @@ push our @CARP_NOT, qw(ReadableStream);
 
 sub ReadableByteStreamController::_invalidate_byob_request ($) {
   return if not defined $_[0]->{byob_request};
-  $_[0]->{byob_request}->{associated_readable_byte_stream_controller} = undef;
+  #$_[0]->{byob_request}->{associated_readable_byte_stream_controller} = undef;
+  if (defined $_[0]->{byob_request_obj}) {
+    ${$_[0]->{byob_request_obj}} = {readable_stream_controller => {byob_request => $_[0]->{byob_request}}};
+  }
   $_[0]->{byob_request}->{view} = undef;
   $_[0]->{byob_request} = undef;
+  $_[0]->{byob_request_obj} = undef;
 } # ReadableByteStreamControllerInvalidateBYOBRequest
 
 sub ReadableByteStreamController::_error ($$) {
@@ -542,7 +546,8 @@ sub new ($$$$) {
 } # new
 
 sub byob_request ($) {
-  my $controller = ${$_[0]}->{readable_stream_controller};
+  my $stream = ${$_[0]};
+  my $controller = $stream->{readable_stream_controller};
   if (not defined $controller->{byob_request} and
       @{$controller->{pending_pull_intos}}) {
     my $first_descriptor = $controller->{pending_pull_intos}->[0];
@@ -550,10 +555,17 @@ sub byob_request ($) {
         ($first_descriptor->{buffer},
          $first_descriptor->{byte_offset} + $first_descriptor->{bytes_filled},
          $first_descriptor->{byte_length} - $first_descriptor->{bytes_filled});
-    $controller->{byob_request} = ReadableStreamBYOBRequest->new
-        ($_[0], $view);
+    return
+    #$controller->{byob_request_obj} = # to be set in new
+    ReadableStreamBYOBRequest->new ($_[0], $view);
   }
-  return $controller->{byob_request};
+  if (defined $controller->{byob_request} and
+      not defined $controller->{byob_request_obj}) {
+    my $req = bless \$stream, $_[0];
+    weaken ($controller->{byob_request_obj} = $req);
+    return $req;
+  }
+  return $controller->{byob_request_obj};
 } # byob_request
 
 sub desired_size ($) {
@@ -810,12 +822,15 @@ sub DESTROY ($) {
 } # DESTROY
 
 package ReadableStreamBYOBRequest;
+use Scalar::Util qw(weaken);
 use Streams::_Common;
 push our @CARP_NOT, qw(ReadableStream);
 
-sub ReadableByteStreamController::_respond_internal ($$$) {
-  my $controller = $_[0];
-  my $stream = $_[2]; #$controller->{controlled_readable_stream};
+sub ReadableByteStreamController::_respond_internal ($$) {
+  #my $controller = $_[0];
+  #my $stream = $controller->{controlled_readable_stream};
+  my $stream = $_[0];
+  my $controller = $_[0]->{readable_stream_controller};
   my $first_descriptor = $controller->{pending_pull_intos}->[0];
   if ($stream->{state} eq 'closed') {
     die _type_error "ReadableStream is closed" unless $_[1] == 0;
@@ -877,35 +892,44 @@ sub ReadableByteStreamController::_respond_internal ($$$) {
 } # ReadableByteStreamControllerRespondInternal
 
 sub new ($$$) {
-  my $self = bless {}, $_[0];
-  if (UNIVERSAL::isa ($_[1], 'ReadableByteStreamController')) { # No "if" in spec
-    $self->{associated_readable_byte_stream_controller}
-        = ${$_[1]}->{readable_stream_controller};
-    $self->{stream} = ${$_[1]}; # Not in JS
+  my $stream = {readable_stream_controller => {}};
+  if (UNIVERSAL::isa ($_[1], 'ReadableByteStreamController')) {
+    $stream = ${$_[1]};
   }
-  $self->{view} = $_[2];
+  my $controller = $stream->{readable_stream_controller};
+
+  my $byob_request = {};
+  #$byob_request->{associated_readable_byte_stream_controller} = $controller;
+  $controller->{byob_request} = $byob_request;
+
+  my $self = bless \$stream, $_[0];
+  weaken ($controller->{byob_request_obj} = $self);
+
+  $byob_request->{view} = $_[2];
   return $self;
 } # new
 
 sub view ($) {
-  return $_[0]->{view};
+  return ${$_[0]}->{readable_stream_controller}->{byob_request}->{view};
 } # view
 
 sub respond ($$) {
   die _type_error "There is no controller"
-      unless defined $_[0]->{associated_readable_byte_stream_controller};
+      unless defined ${$_[0]}->{state};
+      #unless defined $_[0]->{associated_readable_byte_stream_controller};
 
   ## ReadableByteStreamControllerRespond
   my $bytes_written = _to_size $_[1], 'Byte length';
-  ReadableByteStreamController::_respond_internal
-      $_[0]->{associated_readable_byte_stream_controller}, $bytes_written, $_[0]->{stream};
+  ReadableByteStreamController::_respond_internal ${$_[0]}, $bytes_written;
+      #$_[0]->{associated_readable_byte_stream_controller}, $bytes_written;
   return undef;
 } # respond(bytesWritten)
 
 ## Not in JS.  Applications should not use this method.
 sub manakai_respond_by_sysread ($$) {
   die _type_error "There is no controller"
-      unless defined $_[0]->{associated_readable_byte_stream_controller};
+      unless defined ${$_[0]}->{state};
+      #unless defined $_[0]->{associated_readable_byte_stream_controller};
   my $view = $_[0]->view;
   $view->buffer->{array_buffer_data} = \(my $x = ''),
       delete $view->buffer->{allocation_delayed}
@@ -919,51 +943,55 @@ sub manakai_respond_by_sysread ($$) {
 
   ## ReadableByteStreamControllerRespond
   #my $bytes_written = _to_size $bytes_read, 'Byte length';
-  ReadableByteStreamController::_respond_internal
-      $_[0]->{associated_readable_byte_stream_controller}, $bytes_read, $_[0]->{stream};
+  ReadableByteStreamController::_respond_internal ${$_[0]}, $bytes_read;
+      #$_[0]->{associated_readable_byte_stream_controller}, $bytes_read;
 
   return $bytes_read;
 } # manakai_respond_by_sysread
 
 sub respond_with_new_view ($$) {
   die _type_error "There is no controller"
-      unless defined $_[0]->{associated_readable_byte_stream_controller};
+      unless defined ${$_[0]}->{state};
+      #unless defined $_[0]->{associated_readable_byte_stream_controller};
   die _type_error "The argument is not an ArrayBufferView"
       unless UNIVERSAL::isa ($_[1], 'TypedArray') or
              UNIVERSAL::isa ($_[1], 'DataView'); # has [[ViewedArrayBuffer]]
 
   ## ReadableByteStreamControllerRespondWithNewView
-  my $controller = $_[0]->{associated_readable_byte_stream_controller};
-  my $first_descriptor = $controller->{pending_pull_intos}->[0];
+  #my $controller = $_[0]->{associated_readable_byte_stream_controller};
+  #my $first_descriptor = $controller->{pending_pull_intos}->[0];
+  my $first_descriptor = ${$_[0]}->{readable_stream_controller}->{pending_pull_intos}->[0];
   die _range_error "Bad byte offset $_[1]->{byte_offset} != @{[$first_descriptor->{byte_offset} + $first_descriptor->{bytes_filled}]}"
       unless $first_descriptor->{byte_offset} + $first_descriptor->{bytes_filled} == $_[1]->{byte_offset};
   die _range_error "Bad byte length $_[1]->{byte_length} != $first_descriptor->{byte_length}"
       unless $first_descriptor->{byte_length} == $_[1]->{byte_length};
   $first_descriptor->{buffer} = $_[1]->{viewed_array_buffer};
-  ReadableByteStreamController::_respond_internal
-      $controller, $_[1]->{byte_length}, $_[0]->{stream};
+  ReadableByteStreamController::_respond_internal ${$_[0]}, $_[1]->{byte_length};
+      #$controller, $_[1]->{byte_length};
   return undef;
 } # respondWithNewView(view)
 
 ## Not in JS.  Applications should not use this method.
 sub manakai_respond_with_new_view ($$) {
   die _type_error "There is no controller"
-      unless defined $_[0]->{associated_readable_byte_stream_controller};
+      unless defined ${$_[0]}->{state};
+      #unless defined $_[0]->{associated_readable_byte_stream_controller};
   die _type_error "The argument is not an ArrayBufferView"
       unless UNIVERSAL::isa ($_[1], 'TypedArray') or
              UNIVERSAL::isa ($_[1], 'DataView'); # has [[ViewedArrayBuffer]]
 
   ## A modified version of ReadableByteStreamControllerRespondWithNewView
-  my $controller = $_[0]->{associated_readable_byte_stream_controller};
-  my $first_descriptor = $controller->{pending_pull_intos}->[0];
+  #my $controller = $_[0]->{associated_readable_byte_stream_controller};
+  #my $first_descriptor = $controller->{pending_pull_intos}->[0];
+  my $first_descriptor = ${$_[0]}->{readable_stream_controller}->{pending_pull_intos}->[0];
   die _range_error "Bad byte offset $_[1]->{byte_offset} != @{[$first_descriptor->{byte_offset} + $first_descriptor->{bytes_filled}]}"
       unless $first_descriptor->{byte_offset} + $first_descriptor->{bytes_filled} == $_[1]->{byte_offset};
   die "RangeError: not $first_descriptor->{byte_length} >= $_[1]->{byte_length}"
       unless $first_descriptor->{byte_length} >= $_[1]->{byte_length};
   $first_descriptor->{buffer} = $_[1]->{viewed_array_buffer};
   $first_descriptor->{byte_length} = $_[1]->{byte_length};
-  ReadableByteStreamController::_respond_internal
-      $controller, $_[1]->{byte_length}, $_[0]->{stream};
+  ReadableByteStreamController::_respond_internal ${$_[0]}, $_[1]->{byte_length};
+      #$controller, $_[1]->{byte_length};
   return undef;
 } # manakai_respond_with_new_value
 
