@@ -373,9 +373,8 @@ sub new ($$$$$) {
 
     ## ValidateAndNormalizeHighWaterMark
     $hwm = 0+($hwm || 0); ## ToNumber
+    $hwm = 0 if $hwm eq 'NaN' or $hwm eq 'nan'; # Not in JS
     $controller->{strategy_hwm} = $hwm;
-    $controller->{strategy_hwm} = 0
-        if $hwm eq 'NaN' or $hwm eq 'nan'; # Not in JS
     die _range_error "High water mark $hwm is negative" if $hwm < 0;
   }
 
