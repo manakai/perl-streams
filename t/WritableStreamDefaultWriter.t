@@ -91,7 +91,7 @@ test {
     done $c;
     undef $c;
   });
-} n => 1, name => 'write detached';
+} n => 1, name => 'write detached 1';
 
 test {
   my $c = shift;
@@ -111,9 +111,32 @@ test {
     } $c;
     done $c;
     undef $c;
-    undef $ws;
+    undef $ws; undef $w2; # referenced by size referenced by controller
   });
-} n => 1, name => 'write detached';
+} n => 1, name => 'write detached 2';
+
+test {
+  my $c = shift;
+  my $w;
+  my $w2;
+  my $ws; $ws = WritableStream->new (undef, {
+    size => sub {
+      $w->release_lock;
+      $w2 = $ws->get_writer;
+    },
+  });
+  $w = $ws->get_writer;
+  $w->write ("abc")->catch (sub {
+    my $e = $_[0];
+    test {
+      like $e, qr{^TypeError: Writer's lock is released at \Q@{[__FILE__]}\E line \Q@{[__LINE__+6]}\E};
+    } $c;
+    return $w2->close;
+  })->then (sub {
+    done $c;
+    undef $c;
+  });
+} n => 1, name => 'write detached 3';
 
 test {
   my $c = shift;

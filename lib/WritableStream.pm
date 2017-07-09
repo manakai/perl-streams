@@ -3,8 +3,37 @@ use strict;
 use warnings;
 our $VERSION = '1.0';
 use Carp;
+use Scalar::Util qw(weaken);
 use Promise;
 use Streams::_Common;
+
+## In JS (Streams Standard specification text), stream and controller
+## are referencing each other by their internal slots:
+##
+##   stream.[[WritableStreamController]] === controller
+##   controller.[[ControlledWritableStream]] === stream
+##
+## In this module, a $stream is a blessed hash reference whose
+## |writable_stream_controller| is a non-blessed hash reference
+## containing controller's internal slots (except for
+## [[ControlledWritableStream]]).  A $controller_obj is a blessed
+## scalar reference to $stream.  $stream->{controller_obj} is a weak
+## reference to $controller_obj.  $controller_obj is used when
+## $underlying_sink methods are invoked.  If $stream->{controller_obj}
+## is not defined, a new blessed scalar reference is created.
+##
+## Likewise, stream and reader are referencing each other in JS when
+## there is a writer whose lock is not released:
+##
+##   stream.[[Writer]] === writer
+##   writer.[[OwnerWritableStream]] === stream
+##
+## In this module, a $writer is a blessed scalar reference to $stream
+## whose |writer| is a non-blessed hash reference containing writer's
+## internal slots (except for [[OwnerWritableStream]]).  When the
+## $writer's lock is released, $$writer is replaced by a hash
+## reference whose |writer| is $writer's hash reference (and
+## $stream->{writer} is set to |undef|).
 
 sub new ($;$$) {
   die _type_error "Sink is not a HASH"
@@ -27,7 +56,8 @@ sub new ($;$$) {
   $self->{pending_abort_request} = undef;
   $self->{write_requests} = [];
   $self->{backpressure} = !!0;
-  $self->{writable_stream_controller} = WritableStreamDefaultController->new
+  #$self->{writable_stream_controller} = # (to be set within new)
+  WritableStreamDefaultController->new
       ($self, $underlying_sink, $opts->{size}, $opts->{high_water_mark});
   ## [[StartSteps]] is invoked within WritableStreamDefaultController::new
   return $self;
@@ -80,12 +110,18 @@ sub WritableStream::_reject_close_and_closed_promise_if_needed ($) {
     $writer->{closed_promise}->{reject}->($stream->{stored_error});
     $writer->{closed_promise}->{promise}->manakai_set_handled;
   }
+  $stream->_terminate; # Not in JS
 } # WritableStreamRejectCloseAndClosedPromiseIfNeeded
 
 sub WritableStream::_finish_erroring ($) {
   my $stream = $_[0];
   $stream->{state} = 'errored';
-  $stream->{writable_stream_controller}->_error_steps;
+  my $controller_obj = $stream->{controller_obj};
+  unless (defined $controller_obj) {
+    weaken ($stream->{controller_obj} = bless \$stream, 'WritableStreamDefaultController');
+    $controller_obj = $stream->{controller_obj};
+  }
+  $controller_obj->_error_steps;
   my $stored_error = $stream->{stored_error};
   for my $write_request (@{$stream->{write_requests}}) {
     $write_request->{reject}->($stored_error);
@@ -102,7 +138,7 @@ sub WritableStream::_finish_erroring ($) {
     WritableStream::_reject_close_and_closed_promise_if_needed $stream;
     return;
   }
-  $stream->{writable_stream_controller}->_abort_steps ($abort_request->{reason})->then (sub {
+  $controller_obj->_abort_steps ($abort_request->{reason})->then (sub {
     $abort_request->{promise}->{resolve}->(undef);
     WritableStream::_reject_close_and_closed_promise_if_needed $stream;
   }, sub {
@@ -178,8 +214,10 @@ sub abort ($$) {
 } # abort
 
 sub WritableStreamDefaultController::_process_close ($) {
-  my $controller = $_[0];
-  my $stream = $controller->{controlled_writable_stream};
+  #my $controller = $_[0];
+  #my $stream = $controller->{controlled_writable_stream};
+  my $stream = $_[0];
+  my $controller = $_[0]->{writable_stream_controller};
 
   ## WritableStreamMarkCloseRequestInFlight
   $stream->{in_flight_close_request} = $stream->{close_request};
@@ -208,6 +246,7 @@ sub WritableStreamDefaultController::_process_close ($) {
     if (defined $stream->{writer}) {
       $stream->{writer}->{closed_promise}->{resolve}->(undef);
     }
+    $stream->_terminate; # Not in JS
   }, sub {
     ## WritableStreamFinishInFlightCloseWithError
     $stream->{in_flight_close_request}->{reject}->($_[0]);
@@ -221,13 +260,20 @@ sub WritableStreamDefaultController::_process_close ($) {
 } # WritableStreamDefaultControllerProcessClose
 
 sub WritableStreamDefaultController::_process_write ($$) {
-  my $controller = $_[0];
-  my $stream = $controller->{controlled_writable_stream};
+  #my $controller = $_[0];
+  #my $stream = $controller->{controlled_writable_stream};
+  my $stream = $_[0];
+  my $controller = $_[0]->{writable_stream_controller};
 
   ## WritableStreamMarkFirstWriteRequestInFlight
   $stream->{in_flight_write_request} = shift @{$stream->{write_requests}};
 
-  _hashref_method ($controller->{underlying_sink}, 'write', [$_[1], $controller])->then (sub {
+  my $controller_obj = $stream->{controller_obj};
+  unless (defined $controller_obj) {
+    weaken ($stream->{controller_obj} = bless \$stream, 'WritableStreamDefaultController');
+    $controller_obj = $stream->{controller_obj};
+  }
+  _hashref_method ($controller->{underlying_sink}, 'write', [$_[1], $controller_obj])->then (sub {
     ## WritableStreamFinishInFlightWrite
     $stream->{in_flight_write_request}->{resolve}->(undef);
     $stream->{in_flight_write_request} = undef;
@@ -247,7 +293,8 @@ sub WritableStreamDefaultController::_process_write ($$) {
     ) {
       $stream->_update_backpressure ($controller);
     }
-    WritableStreamDefaultController::_advance_queue_if_needed ($controller);
+    WritableStreamDefaultController::_advance_queue_if_needed
+        ($stream); #($controller);
   }, sub {
     ## WritableStreamFinishInFlightWriteWithError
     $stream->{in_flight_write_request}->{reject}->($_[0]);
@@ -257,8 +304,10 @@ sub WritableStreamDefaultController::_process_write ($$) {
 } # WritableStreamDefaultControllerProcessWrite
 
 sub WritableStreamDefaultController::_advance_queue_if_needed ($) {
-  my $controller = $_[0];
-  my $stream = $controller->{controlled_writable_stream};
+  #my $controller = $_[0];
+  #my $stream = $controller->{controlled_writable_stream};
+  my $stream = $_[0];
+  my $controller = $_[0]->{writable_stream_controller};
   return if not $controller->{started};
   return if defined $stream->{in_flight_write_request};
   return if $stream->{state} eq 'closed' or $stream->{state} eq 'errored';
@@ -270,12 +319,20 @@ sub WritableStreamDefaultController::_advance_queue_if_needed ($) {
 
   my $write_record = $controller->{queue}->[0]->{value}; # PeekQueueValue
   if ($write_record eq 'close') {
-    WritableStreamDefaultController::_process_close $controller;
+    WritableStreamDefaultController::_process_close $stream; #$controller;
   } else {
     WritableStreamDefaultController::_process_write
-        $controller, $write_record->{chunk};
+        $stream, $write_record->{chunk};
+        #$controller, $write_record->{chunk};
   }
 } # WritableStreamDefaultControllerAdvanceQueueIfNeeded
+
+## Not in JS
+sub _terminate ($) {
+  my $stream = $_[0];
+  delete $stream->{writable_stream_controller}->{underlying_sink};
+  delete $stream->{writable_stream_controller}->{strategy_size};
+} # _terminate
 
 sub DESTROY ($) {
   local $@;
@@ -288,71 +345,81 @@ sub DESTROY ($) {
 } # DESTROY
 
 package WritableStreamDefaultController;
+use Scalar::Util qw(weaken);
 use Streams::_Common;
 push our @CARP_NOT, qw(WritableStream);
 
 sub new ($$$$$) {
-  my (undef, $stream, $underlying_sink, $size, $high_water_mark) = @_;
-  my $self = bless {}, $_[0];
+  my (undef, $stream, $underlying_sink, $size, $hwm) = @_;
   die _type_error "The argument is not a WritableStream"
       unless UNIVERSAL::isa ($stream, 'WritableStream'); # IsWritableStream
   die _type_error "WritableStream has a controller"
       if defined $stream->{writable_stream_controller};
-  $self->{controlled_writable_stream} = $stream;
-  $self->{underlying_sink} = $underlying_sink;
-  $self->{started} = 0;
+  my $controller = {};
+  #$controller->{controlled_writable_stream} = $stream;
+  my $self = bless \$stream, $_[0];
+  $controller->{underlying_sink} = $underlying_sink;
+  $controller->{started} = 0;
 
   ## ResetQueue
-  $self->{queue} = [];
-  $self->{queue_total_size} = 0;
+  $controller->{queue} = [];
+  $controller->{queue_total_size} = 0;
 
   ## ValidateAndNormalizeQueuingStrategy
   {
     die _type_error "Size is not a CODE"
         if defined $size and not ref $size eq 'CODE';
-    $self->{strategy_size} = $size;
+    $controller->{strategy_size} = $size;
 
     ## ValidateAndNormalizeHighWaterMark
-    $self->{strategy_hwm} = 0+$high_water_mark; ## ToNumber
-    $self->{strategy_hwm} = 0 if $high_water_mark eq 'NaN' or $high_water_mark eq 'nan'; # Not in JS
-    die _range_error "High water mark $high_water_mark is negative"
-        if $high_water_mark < 0;
+    $hwm = 0+($hwm || 0); ## ToNumber
+    $controller->{strategy_hwm} = $hwm;
+    $controller->{strategy_hwm} = 0
+        if $hwm eq 'NaN' or $hwm eq 'nan'; # Not in JS
+    die _range_error "High water mark $hwm is negative" if $hwm < 0;
   }
 
-  $stream->_update_backpressure ($self);
+  $stream->_update_backpressure ($controller);
 
   ## [[StartSteps]].  In the spec, this is invoked from WritableStream::new.
   _hashref_method_throws ($underlying_sink, 'start', [$self])->then (sub { # requires Promise
-    $self->{started} = 1;
-    WritableStreamDefaultController::_advance_queue_if_needed $self;
+    $controller->{started} = 1;
+    WritableStreamDefaultController::_advance_queue_if_needed
+        $stream; #$controller;
   }, sub {
-    $self->{started} = 1;
+    $controller->{started} = 1;
     WritableStream::_deal_with_rejection $stream, $_[0];
   });
+
+  ## In spec, done within WritableStream constructor
+  $stream->{writable_stream_controller} = $controller;
+  weaken ($stream->{controller_obj} = $self);
 
   return $self;
 } # new
 
 sub error ($$) {
-  my $state = $_[0]->{controlled_writable_stream}->{state};
-  return undef unless $state eq 'writable';
+  my $stream = ${$_[0]}; #$_[0]->{controlled_writable_stream};
+  return undef unless $stream->{state} eq 'writable';
 
   ## WritableStreamDefaultControllerError
-  {
-    WritableStream::_start_erroring $_[0]->{controlled_writable_stream}, $_[1];
-  }
+  WritableStream::_start_erroring $stream, $_[1];
 
   return undef;
 } # error(e)
 
 sub _abort_steps ($$) {
-  return _hashref_method ($_[0]->{underlying_sink}, 'abort', [$_[1]]);
+  my $controller = ${$_[0]}->{writable_stream_controller};
+
+  return _hashref_method ($controller->{underlying_sink}, 'abort', [$_[1]]);
 } # [[AbortSteps]]
 
 sub _error_steps ($) {
+  my $controller = ${$_[0]}->{writable_stream_controller};
+
   ## ResetQueue
-  $_[0]->{queue} = [];
-  $_[0]->{queue_total_size} = 0;
+  $controller->{queue} = [];
+  $controller->{queue_total_size} = 0;
 } # [[ErrorSteps]]
 
 sub DESTROY ($) {
@@ -473,7 +540,7 @@ sub close ($) {
       #$stream->{writable_stream_controller}->{queue_total_size} += $size;
 
       WritableStreamDefaultController::_advance_queue_if_needed
-          $stream->{writable_stream_controller};
+          $stream; #$stream->{writable_stream_controller};
     }
 
     return $p->{promise};
@@ -521,9 +588,9 @@ sub write ($$) {
     eval { $chunk_size = $controller->{strategy_size}->($_[1]) };
     if ($@) {
       ## WritableStreamDefaultControllerErrorIfNeeded
-      if ($controller->{controlled_writable_stream}->{state} eq 'writable') {
+      if ($stream->{state} eq 'writable') {
         ## WritableStreamDefaultControllerError
-        WritableStream::_start_erroring $controller->{controlled_writable_stream}, $@;
+        WritableStream::_start_erroring $stream, $@;
       }
     }
   }
@@ -554,16 +621,15 @@ sub write ($$) {
     my $size = eval { _to_size $chunk_size, 'Size' };
     if ($@) {
       ## WritableStreamDefaultControllerErrorIfNeeded
-      if ($controller->{controlled_writable_stream}->{state} eq 'writable') {
+      if ($stream->{state} eq 'writable') {
         ## WritableStreamDefaultControllerError
-        WritableStream::_start_erroring $controller->{controlled_writable_stream}, $@;
+        WritableStream::_start_erroring $stream, $@;
       }
       last;
     }
     push @{$controller->{queue}}, {value => {chunk => $_[1]}, size => $size};
     $controller->{queue_total_size} += $size;
 
-    my $stream = $controller->{controlled_writable_stream};
     if (
       not
         ## WritableStreamCloseQueuedOrInFlight
@@ -573,7 +639,8 @@ sub write ($$) {
     ) {
       $stream->_update_backpressure ($controller);
     }
-    WritableStreamDefaultController::_advance_queue_if_needed $controller;
+    WritableStreamDefaultController::_advance_queue_if_needed
+        $stream; #$controller;
   }
 
   return $pc->{promise};
@@ -590,8 +657,6 @@ sub DESTROY ($) {
 1;
 
 # XXX documentation
-# XXX loop
-#   [13] [14]
 
 =head1 LICENSE
 

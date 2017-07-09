@@ -325,6 +325,7 @@ test {
       is $resolved, 1;
       is $written, 1, '$resolved is 1 when write is invoked';
     } $c;
+    undef $start_args; # $start_args->[0] is $sink which references $start_args
     done $c;
     undef $c;
   });
@@ -633,6 +634,129 @@ test {
     undef $c;
   });
 } n => 3, name => 'write';
+
+test {
+  my $c = shift;
+  my @c;
+  my $ws = WritableStream->new ({
+    start => sub {
+      push @c, $_[1];
+    },
+    write => sub {
+      push @c, $_[2];
+    },
+  });
+  my $writer = $ws->get_writer;
+  $writer->write (1);
+  $writer->write (2);
+  $writer->close;
+  $writer->closed->then (sub {
+    test {
+      is 0+@c, 3;
+      is $c[0], $c[1];
+      is $c[0], $c[2];
+    } $c;
+    done $c;
+    undef $c;
+  });
+} n => 3, name => 'same controller objects';
+
+test {
+  my $c = shift;
+  my $ws = WritableStream->new ({
+    start => sub {
+      my $wc = $_[1];
+      test {
+        isa_ok $wc, 'WritableStreamDefaultController';
+      } $c;
+    },
+    write => sub {
+      my $wc = $_[2];
+      test {
+        isa_ok $wc, 'WritableStreamDefaultController';
+      } $c;
+    },
+  });
+  my $writer = $ws->get_writer;
+  $writer->write (1);
+  $writer->write (2);
+  $writer->close;
+  $writer->closed->then (sub {
+    done $c;
+    undef $c;
+  });
+} n => 3, name => 'controller objects';
+
+{
+  package test::DestroyCallback1;
+  sub DESTROY {
+    $_[0]->();
+  }
+}
+
+test {
+  my $c = shift;
+  my $destroyed;
+  {
+    my $ws = WritableStream->new;
+    $ws->{_destroy} = bless sub { $destroyed = 1 }, 'test::DestroyCallback1';
+  }
+  Promise->resolve->then (sub {
+    test {
+      ok $destroyed;
+      done $c;
+      undef $c;
+    } $c;
+  });
+} n => 1, name => 'destroy';
+
+test {
+  my $c = shift;
+  my $p;
+  my $destroyed;
+  {
+    my $wc;
+    my $ws = WritableStream->new ({
+      start => sub { $wc = $_[1] },
+    });
+    $ws->{_destroy} = bless sub { $destroyed = 1 }, 'test::DestroyCallback1';
+    my $w = $ws->get_writer;
+    $p = $w->write (4);
+    Promise->resolve->then (sub {
+      undef $wc; # need explicit freeing!
+    });
+  }
+  Promise->resolve ($p)->then (sub {
+    test {
+      ok $destroyed;
+      done $c;
+      undef $c;
+    } $c;
+  });
+} n => 1, name => 'destroy';
+
+test {
+  my $c = shift;
+  my $p;
+  my $destroyed;
+  {
+    my $wc;
+    my $ws = WritableStream->new ({
+      start => sub { $wc = $_[1] },
+    });
+    $ws->{_destroy} = bless sub { $destroyed = 1 }, 'test::DestroyCallback1';
+    my $w = $ws->get_writer;
+    $w->write (4);
+    $p = $w->close;
+  }
+  Promise->resolve ($p)->then (sub {
+    test {
+      ok $destroyed;
+      done $c;
+      undef $c;
+    } $c;
+  });
+} n => 1, name => 'destroy';
 
 run_tests;
 
