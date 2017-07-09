@@ -162,6 +162,7 @@ test {
   $r->release_lock;
   $r->cancel->catch (sub {
     my $e = $_[0];
+    undef $rc; # referencing $rs referencing start referencing $rc
     test {
       like $e, qr{^TypeError: Reader's lock is released at \Q@{[__FILE__]}\E line \Q@{[__LINE__+4]}\E};
     } $c;
@@ -333,6 +334,7 @@ test {
     high_water_mark => 314,
   });
   is $rc->desired_size, 314;
+  undef $rc; # referencing $rs referencing start referencing $rc
   done $c;
 } n => 1, name => 'high_water_mark integer';
 
@@ -345,6 +347,7 @@ test {
     high_water_mark => 314.42,
   });
   is $rc->desired_size, 314.42;
+  undef $rc; # referencing $rs referencing start referencing $rc
   done $c;
 } n => 1, name => 'high_water_mark float';
 
@@ -357,6 +360,7 @@ test {
     high_water_mark => "42abc",
   });
   is $rc->desired_size, 42;
+  undef $rc; # referencing $rs referencing start referencing $rc
   done $c;
 } n => 1, name => 'high_water_mark number string';
 
@@ -369,6 +373,7 @@ test {
     high_water_mark => 0,
   });
   is $rc->desired_size, 0;
+  undef $rc; # referencing $rs referencing start referencing $rc
   done $c;
 } n => 1, name => 'high_water_mark zero';
 
@@ -381,6 +386,7 @@ test {
     high_water_mark => "abcd",
   });
   is $rc->desired_size, 0;
+  undef $rc; # referencing $rs referencing start referencing $rc
   done $c;
 } n => 1, name => 'high_water_mark string';
 
@@ -393,6 +399,7 @@ test {
     high_water_mark => 0+"Inf",
   });
   is $rc->desired_size, 0+"Inf";
+  undef $rc; # referencing $rs referencing start referencing $rc
   done $c;
 } n => 1, name => 'high_water_mark Inf';
 
@@ -405,6 +412,7 @@ test {
     high_water_mark => 0+"NaN",
   });
   is $rc->desired_size, 0;
+  undef $rc; # referencing $rs referencing start referencing $rc
   done $c;
 } n => 1, name => 'high_water_mark NaN';
 
@@ -454,6 +462,7 @@ test {
       is $got, $chunk;
       ok $rc->desired_size < 314;
     } $c;
+    undef $rc; # referencing $rs referencing start referencing $rc
     done $c;
     undef $c;
   });
@@ -500,6 +509,7 @@ test {
     test {
       like $e, qr{^Size fails at \Q@{[__FILE__]}\E line \Q@{[__LINE__-24]}\E};
     } $c;
+    undef $rc; # referencing $rs referencing start referencing $rc
     done $c;
     undef $c;
   });

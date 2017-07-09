@@ -263,6 +263,7 @@ test {
       ok 1;
     } $c;
   })->then (sub {
+    undef $rc; # referencing $rs referencing start referencing $rc
     done $c;
     undef $c;
   });
@@ -405,6 +406,7 @@ test {
       is $resolved, 1;
       is $read, 1, '$resolved is 1 when write is invoked';
     } $c;
+    undef $start_args; # [0] - $source->{start} - $start_args / [1] $rc
     done $c;
     undef $c;
   });

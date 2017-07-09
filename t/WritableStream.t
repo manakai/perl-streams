@@ -52,7 +52,7 @@ test {
   $writer->write ("abc");
   $writer->write ('xyz');
   $writer->close;
-  $writer->close;
+  $writer->close->catch (sub { });
   $writer->closed->then (sub {
     test {
       is $written, '(start)abcxyz(close)';

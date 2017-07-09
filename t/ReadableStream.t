@@ -197,6 +197,7 @@ test {
       is $resolved, 1;
       is $read, 1, '$resolved is 1 when write is invoked';
     } $c;
+    undef $start_args; # [0] - $source->{start} - $start_args / [1] $rc
     done $c;
     undef $c;
   });
@@ -387,6 +388,7 @@ test {
   my $r = $rs->get_reader;
   $rs->cancel->catch (sub {
     my $e = $_[0];
+    undef $rc; # referencing $rs referencing start referencing $rc
     test {
       like $e, qr{^\QTypeError: ReadableStream is locked\E at \Q@{[__FILE__]}\E line \Q@{[__LINE__+4]}\E};
     } $c;

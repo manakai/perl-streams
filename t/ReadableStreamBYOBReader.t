@@ -248,6 +248,7 @@ test {
   $r->release_lock;
   $r->cancel->catch (sub {
     my $e = $_[0];
+    undef $rc; # referencing $rs referencing start referencing $rc
     test {
       like $e, qr{^TypeError: Reader's lock is released at \Q@{[__FILE__]}\E line \Q@{[__LINE__+4]}\E};
     } $c;

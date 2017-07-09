@@ -118,6 +118,7 @@ for my $value (
       $rc->enqueue ($value);
     };
     like $@, qr{^TypeError: The argument is not an ArrayBufferView at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
+    undef $rc; # referencing $rs referencing start referencing $rc
     done $c;
   } n => 1, name => 'enqueue bad argument';
 }
@@ -132,6 +133,7 @@ test {
     high_water_mark => 314,
   });
   is $rc->desired_size, 314;
+  undef $rc; # referencing $rs referencing start referencing $rc
   done $c;
 } n => 1, name => 'high_water_mark integer';
 
@@ -145,6 +147,7 @@ test {
     high_water_mark => 314.42,
   });
   is $rc->desired_size, 314.42;
+  undef $rc; # referencing $rs referencing start referencing $rc
   done $c;
 } n => 1, name => 'high_water_mark float';
 
@@ -158,6 +161,7 @@ test {
     high_water_mark => "42abc",
   });
   is $rc->desired_size, 42;
+  undef $rc; # referencing $rs referencing start referencing $rc
   done $c;
 } n => 1, name => 'high_water_mark number string';
 
@@ -171,6 +175,7 @@ test {
     high_water_mark => 0,
   });
   is $rc->desired_size, 0;
+  undef $rc; # referencing $rs referencing start referencing $rc
   done $c;
 } n => 1, name => 'high_water_mark zero';
 
@@ -184,6 +189,7 @@ test {
     high_water_mark => "abcd",
   });
   is $rc->desired_size, 0;
+  undef $rc; # referencing $rs referencing start referencing $rc
   done $c;
 } n => 1, name => 'high_water_mark string';
 
@@ -197,6 +203,7 @@ test {
     high_water_mark => 0+"Inf",
   });
   is $rc->desired_size, 0+"Inf";
+  undef $rc; # referencing $rs referencing start referencing $rc
   done $c;
 } n => 1, name => 'high_water_mark Inf';
 
@@ -210,6 +217,7 @@ test {
     high_water_mark => 0+"NaN",
   });
   is $rc->desired_size, 0;
+  undef $rc; # referencing $rs referencing start referencing $rc
   done $c;
 } n => 1, name => 'high_water_mark NaN';
 
@@ -312,6 +320,7 @@ test {
     start => sub { $rc = $_[1] },
   });
   is $rc->byob_request, undef;
+  undef $rc; # referencing $rs referencing start referencing $rc
   done $c;
 } n => 1, name => 'byob_request no request';
 

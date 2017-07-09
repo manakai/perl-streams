@@ -50,14 +50,15 @@ sub ReadableStream::_close ($) {
   my $stream = $_[0];
   $stream->{state} = 'closed';
   my $reader = $stream->{reader};
-  return if not defined $reader;
-  if (defined $reader->{read_requests}) { # IsReadableStreamDefaultReader
-    for my $read_request (@{$reader->{read_requests}}) {
-      $read_request->{resolve}->({done => 1});
+  if (defined $reader) {
+    if (defined $reader->{read_requests}) { # IsReadableStreamDefaultReader
+      for my $read_request (@{$reader->{read_requests}}) {
+        $read_request->{resolve}->({done => 1});
+      }
+      $reader->{read_requests} = [];
     }
-    $reader->{read_requests} = [];
+    $reader->{closed_promise}->{resolve}->(undef);
   }
-  $reader->{closed_promise}->{resolve}->(undef);
 } # ReadableStreamClose
 
 sub ReadableStream::_cancel ($$) {
@@ -74,7 +75,10 @@ sub ReadableStream::_cancel ($$) {
     weaken ($stream->{controller_obj} = bless \$stream, $stream->{controller_class});
     $controller_obj = $stream->{controller_obj};
   }
-  return $controller_obj->_cancel_steps ($_[1])->then (sub { return undef });
+  return $controller_obj->_cancel_steps ($_[1])->then (sub {
+    $stream->_terminate; # Not in JS
+    return undef;
+  });
 } # ReadableStreamCancel
 
 sub cancel ($;$) {
@@ -102,6 +106,14 @@ sub get_reader ($;$) {
 # $rs->pipe_to pipe_through tee
 
 ## XXX IsReadableStreamDisturbed hook
+
+# Not in JS
+sub _terminate ($) {
+  my $stream = $_[0];
+  delete $stream->{readable_stream_controller}->{underlying_source};
+  delete $stream->{readable_stream_controller}->{underlying_byte_source};
+  delete $stream->{readable_stream_controller}->{strategy_size};
+} # _terminate
 
 sub DESTROY ($) {
   local $@;
@@ -132,20 +144,22 @@ sub ReadableStream::_error ($$) {
   $stream->{state} = 'errored';
   $stream->{stored_error} = $_[1];
   my $reader = $stream->{reader};
-  return if not defined $reader;
-  if (defined $reader->{read_requests}) { # IsReadableStreamDefaultReader
-    for my $read_request (@{$reader->{read_requests}}) {
-      $read_request->{promise}->{reject}->($_[1]);
+  if (defined $reader) {
+    if (defined $reader->{read_requests}) { # IsReadableStreamDefaultReader
+      for my $read_request (@{$reader->{read_requests}}) {
+        $read_request->{promise}->{reject}->($_[1]);
+      }
+      $reader->{read_requests} = [];
+    } else {
+      for my $read_into_request (@{$reader->{read_into_requests}}) {
+        $read_into_request->{promise}->{reject}->($_[1]);
+      }
+      $reader->{read_into_requests} = [];
     }
-    $reader->{read_requests} = [];
-  } else {
-    for my $read_into_request (@{$reader->{read_into_requests}}) {
-      $read_into_request->{promise}->{reject}->($_[1]);
-    }
-    $reader->{read_into_requests} = [];
+    $reader->{closed_promise}->{reject}->($_[1]);
+    $reader->{closed_promise}->{promise}->manakai_set_handled;
   }
-  $reader->{closed_promise}->{reject}->($_[1]);
-  # $reader->{closed_promise}->{promise_is_handled} = 1;
+  $stream->_terminate; # Not in JS
 } # ReadableStreamError
 
 sub ReadableStreamDefaultController::_error ($$$) {
@@ -275,7 +289,9 @@ sub close ($) {
   $controller->{close_requested} = 1;
   unless (@{$controller->{queue}}) {
     ReadableStream::_close $stream;
+    $stream->_terminate; # Not in JS
   }
+  return undef;
 } # close
 
 sub enqueue ($$) {
@@ -355,6 +371,7 @@ sub _pull_steps ($) {
 
     if ($controller->{close_requested} and not @{$controller->{queue}}) {
       ReadableStream::_close $stream;
+      $stream->_terminate; # Not in JS
     } else {
       ReadableStreamDefaultController::_call_pull_if_needed
           $controller, $stream;
@@ -596,6 +613,7 @@ sub close ($) {
     }
   }
   ReadableStream::_close $stream;
+  $stream->_terminate; # Not in JS
   return undef;
 } # close
 
@@ -783,6 +801,7 @@ sub _pull_steps ($) {
     if ($controller->{queue_total_size} == 0 and
         $controller->{close_requested}) {
       ReadableStream::_close $stream;
+      $stream->_terminate; # Not in JS
     } else {
       ReadableByteStreamController::_call_pull_if_needed $stream;
       #ReadableByteStreamController::_call_pull_if_needed $controller;
@@ -1210,6 +1229,7 @@ sub read ($$) {
         if ($controller->{queue_total_size} == 0 and
             $controller->{close_requested}) {
           ReadableStream::_close $stream;
+          $stream->_terminate; # Not in JS
         } else {
           ReadableByteStreamController::_call_pull_if_needed $stream;
           #ReadableByteStreamController::_call_pull_if_needed $controller;
