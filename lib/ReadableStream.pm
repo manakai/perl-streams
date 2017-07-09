@@ -48,7 +48,7 @@ sub ReadableStream::_close ($) {
   $stream->{state} = 'closed';
   my $reader = $stream->{reader};
   return if not defined $reader;
-  if (UNIVERSAL::isa ($reader, 'ReadableStreamDefaultReader')) { # IsReadableStreamDefaultReader = [[ReadRequests]]
+  if (defined $reader->{read_requests}) { # IsReadableStreamDefaultReader
     for my $read_request (@{$reader->{read_requests}}) {
       $read_request->{resolve}->({done => 1});
     }
@@ -125,7 +125,7 @@ sub ReadableStream::_error ($$) {
   $stream->{stored_error} = $_[1];
   my $reader = $stream->{reader};
   return if not defined $reader;
-  if (UNIVERSAL::isa ($reader, 'ReadableStreamDefaultReader')) { # IsReadableStreamDefaultReader = [[ReadRequests]]
+  if (defined $reader->{read_requests}) { # IsReadableStreamDefaultReader
     for my $read_request (@{$reader->{read_requests}}) {
       $read_request->{promise}->{reject}->($_[1]);
     }
@@ -322,25 +322,23 @@ sub _pull_steps ($) {
   my $stream = $controller->{controlled_readable_stream};
   if (@{$controller->{queue}}) {
     ## DequeueValue
-    my $chunk = do {
-      my $pair = shift @{$controller->{queue}};
-      $controller->{queue_total_size} -= $pair->{size};
-      $controller->{queue_total_size} = 0 if $controller->{queue_total_size} < 0;
-      $pair->{value};
-    };
-    if ($_[0]->{close_requested} and not @{$_[0]->{queue}}) {
+    my $pair = shift @{$controller->{queue}};
+    $controller->{queue_total_size} -= $pair->{size};
+    $controller->{queue_total_size} = 0 if $controller->{queue_total_size} < 0;
+
+    if ($controller->{close_requested} and not @{$controller->{queue}}) {
       ReadableStream::_close $stream;
     } else {
-      ReadableStreamDefaultController::_call_pull_if_needed $_[0];
+      ReadableStreamDefaultController::_call_pull_if_needed $controller;
     }
-    return Promise->resolve ({value => $chunk}); # CreateIterResultObject
+    return Promise->resolve ({value => $pair->{value}}); # CreateIterResultObject
   }
 
   ## ReadableStreamAddReadRequest
   my $p = _promise_capability;
   push @{$stream->{reader}->{read_requests}}, {promise => $p};
 
-  ReadableStreamDefaultController::_call_pull_if_needed $stream;
+  ReadableStreamDefaultController::_call_pull_if_needed $controller;
   return $p->{promise};
 } # [[PullSteps]]
 
@@ -397,7 +395,7 @@ sub ReadableByteStreamController::_call_pull_if_needed ($) {
     return unless $controller->{started};
     if (
       ## ReadableStreamHasDefaultReader
-      UNIVERSAL::isa ($stream->{reader}, 'ReadableStreamDefaultReader') # IsReadableStreamDefaultReader = [[ReadRequests]]
+      (defined $stream->{reader} and defined $stream->{reader}->{read_requests}) # IsReadableStreamDefaultReader
       and
       (
         ## ReadableStreamGetNumReadRequests
@@ -408,7 +406,7 @@ sub ReadableByteStreamController::_call_pull_if_needed ($) {
     }
     if (
       ## ReadableStreamHasBYOBReader
-      UNIVERSAL::isa ($stream->{reader}, 'ReadableStreamBYOBReader') # IsReadableStreamBYOBReader = [[ReadIntoRequests]]
+      (defined $stream->{reader} and defined $stream->{reader}->{read_into_requests}) # IsReadableStreamBYOBReader
       and
         (
           ## ReadableStreamGetNumReadIntoRequests
@@ -633,7 +631,7 @@ sub enqueue ($$) {
   my $transferred_buffer = $buffer->_transfer;
   if (
     ## ReadableStreamHasDefaultReader
-    UNIVERSAL::isa ($stream->{reader}, 'ReadableStreamDefaultReader') # IsReadableStreamDefaultReader = [[ReadRequests]]
+    (defined $stream->{reader} and $stream->{reader}->{read_requests}) # IsReadableStreamDefaultReader
   ) {
     if (
       ## ReadableStreamGetNumReadRequests
@@ -656,7 +654,7 @@ sub enqueue ($$) {
     }
   } elsif (
     ## ReadableStreamHasBYOBReader
-    UNIVERSAL::isa ($stream->{reader}, 'ReadableStreamBYOBReader') # IsReadableStreamBYOBReader = [[ReadIntoRequests]]
+    (defined $stream->{reader} and defined $stream->{reader}->{read_into_requests}) # IsReadableStreamBYOBReader
   ) {
     ## ReadableByteStreamControllerEnqueueChunkToQueue
     push @{$controller->{queue}}, {
@@ -760,7 +758,7 @@ sub ReadableByteStreamController::_respond_internal ($$) {
     $first_descriptor->{buffer} = $first_descriptor->{buffer}->_transfer;
     if (
       ## ReadableStreamHasBYOBReader
-      UNIVERSAL::isa ($stream->{reader}, 'ReadableStreamBYOBReader') # IsReadableStreamBYOBReader = [[ReadIntoRequests]]
+      (defined $stream->{reader} and defined $stream->{reader}->{read_into_requests}) # IsReadableStreamBYOBReader
     ) {
       while (
         ## ReadableStreamGetNumReadIntoRequests
@@ -916,10 +914,11 @@ sub new ($$) {
       unless UNIVERSAL::isa ($stream, 'ReadableStream'); # IsReadableStream
   die _type_error "ReadableStream is locked"
       if defined $stream->{reader}; # IsReadableStreamLocked
-  my $reader = bless {}, $_[0];
+  my $reader = {};
+  my $self = bless \$stream, $_[0];
 
   ## ReadableStreamReaderGenericInitialize
-  $reader->{owner_readable_stream} = $stream;
+  #$reader->{owner_readable_stream} = $stream;
   $stream->{reader} = $reader;
   $reader->{closed_promise} = _promise_capability;
   if ($stream->{state} eq 'readable') {
@@ -932,13 +931,14 @@ sub new ($$) {
   }
 
   $reader->{read_requests} = [];
-  return $reader;
+  return $self;
 } # new
 
 sub read ($) {
-  my $stream = $_[0]->{owner_readable_stream};
+  my $stream = ${$_[0]};
+  #my $stream = $_[0]->{owner_readable_stream};
   return Promise->reject (_type_error "Reader's lock is released")
-      unless defined $stream;
+      unless defined $stream->{state};
 
   ## ReadableStreamDefaultReaderRead
   $stream->{disturbed} = 1;
@@ -951,31 +951,38 @@ sub read ($) {
 } # read
 
 sub closed ($) {
-  return $_[0]->{closed_promise}->{promise};
+  my $reader = ${$_[0]}->{reader};
+  return $reader->{closed_promise}->{promise};
 } # closed
 
 sub cancel ($$) {
+  my $stream = ${$_[0]};
   return Promise->reject (_type_error "Reader's lock is released")
-      unless defined $_[0]->{owner_readable_stream};
+      unless defined $stream->{state}; #$_[0]->{owner_readable_stream};
 
   ## ReadableStreamReaderGenericCancel
-  return ReadableStream::_cancel $_[0]->{owner_readable_stream}, $_[1];
+  return ReadableStream::_cancel $stream, $_[1];
+  #return ReadableStream::_cancel $_[0]->{owner_readable_stream}, $_[1];
 } # cancel
 
 sub release_lock ($) {
-  my $reader = $_[0];
-  return undef unless defined $reader->{owner_readable_stream};
+  my $reader = ${$_[0]}->{reader};
+  return undef unless defined ${$_[0]}->{state}; #$reader->{owner_readable_stream};
   die _type_error "There is a pending read request"
       if @{$reader->{read_requests}};
 
   ## ReadableStreamReaderGenericRelease
   $reader->{closed_promise} ||= _promise_capability;
-  if ($reader->{owner_readable_stream}->{state} eq 'readable') {
+  #if ($reader->{owner_readable_stream}->{state} eq 'readable') {
+  if (${$_[0]}->{state} eq 'readable') {
     $reader->{closed_promise}->{reject}->(_type_error "Reader's lock is released");
   }
   $reader->{closed_promise}->{promise}->manakai_set_handled;
-  $reader->{owner_readable_stream}->{reader} = undef;
-  $reader->{owner_readable_stream} = undef;
+
+  ${$_[0]}->{reader} = undef;
+  ${$_[0]} = {reader => $reader};
+  #$reader->{owner_readable_stream}->{reader} = undef;
+  #$reader->{owner_readable_stream} = undef;
 
   return undef;
 } # releaseLock
@@ -1001,10 +1008,11 @@ sub new ($$) {
           ('ReadableByteStreamController'); # IsReadableByteStreamController
   die _type_error "ReadableStream is locked"
       if defined $stream->{reader}; # IsReadableStreamLocked
-  my $reader = bless {}, $_[0];
+  my $reader = {};
+  my $self = bless \$stream, $_[0];
 
   ## ReadableStreamReaderGenericInitialize
-  $reader->{owner_readable_stream} = $stream;
+  #$reader->{owner_readable_stream} = $stream;
   $stream->{reader} = $reader;
   $reader->{closed_promise} = _promise_capability;
   if ($stream->{state} eq 'readable') {
@@ -1017,26 +1025,29 @@ sub new ($$) {
   }
 
   $reader->{read_into_requests} = [];
-  return $reader;
+  return $self;
 } # new
 
 sub closed ($) {
-  return $_[0]->{closed_promise}->{promise};
+  my $reader = ${$_[0]}->{reader};
+  return $reader->{closed_promise}->{promise};
 } # closed
 
 sub cancel ($$) {
+  my $stream = ${$_[0]};
   return Promise->reject (_type_error "Reader's lock is released")
-      unless defined $_[0]->{owner_readable_stream};
+      unless defined $stream->{state}; #$_[0]->{owner_readable_stream};
 
   ## ReadableStreamReaderGenericCancel
-  return ReadableStream::_cancel $_[0]->{owner_readable_stream}, $_[1];
+  return ReadableStream::_cancel $stream, $_[1];
+  #return ReadableStream::_cancel $_[0]->{owner_readable_stream}, $_[1];
 } # cancel
 
 sub read ($$) {
-  my $stream = $_[0]->{owner_readable_stream};
+  my $stream = ${$_[0]}; #$_[0]->{owner_readable_stream};
   my $view = $_[1];
   return Promise->reject (_type_error "Reader's lock is released")
-      unless defined $stream;
+      unless defined $stream->{state};
   return Promise->reject (_type_error "The argument is not an ArrayBufferView")
       unless UNIVERSAL::isa ($view, 'TypedArray') or
              UNIVERSAL::isa ($view, 'DataView'); # has [[ViewedArrayBuffer]]
@@ -1120,19 +1131,23 @@ sub read ($$) {
 } # read
 
 sub release_lock ($) {
-  my $reader = $_[0];
-  return undef unless defined $reader->{owner_readable_stream};
+  my $reader = ${$_[0]}->{reader};
+  return undef unless defined ${$_[0]}->{state}; #$reader->{owner_readable_stream};
   die _type_error "There is a pending read request"
       if @{$reader->{read_into_requests}};
 
   ## ReadableStreamReaderGenericRelease
   $reader->{closed_promise} ||= _promise_capability;
-  if ($reader->{owner_readable_stream}->{state} eq 'readable') {
+  if (${$_[0]}->{state} eq 'readable') {
+  #if ($reader->{owner_readable_stream}->{state} eq 'readable') {
     $reader->{closed_promise}->{reject}->(_type_error "Reader's lock is released");
   }
   $reader->{closed_promise}->{promise}->manakai_set_handled;
-  $reader->{owner_readable_stream}->{reader} = undef;
-  $reader->{owner_readable_stream} = undef;
+
+  ${$_[0]}->{reader} = undef;
+  ${$_[0]} = {reader => $reader};
+  #$reader->{owner_readable_stream}->{reader} = undef;
+  #$reader->{owner_readable_stream} = undef;
 
   return undef;
 } # releaseLock

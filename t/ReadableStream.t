@@ -413,7 +413,7 @@ test {
     done $c;
     undef $c;
   });
-} n => 2, name => 'pull';
+} n => 2, name => 'pull 1';
 
 test {
   my $c = shift;
@@ -436,7 +436,7 @@ test {
     done $c;
     undef $c;
   });
-} n => 2, name => 'pull';
+} n => 2, name => 'pull 2';
 
 test {
   my $c = shift;
@@ -465,7 +465,7 @@ test {
     done $c;
     undef $c;
   });
-} n => 4, name => 'pull';
+} n => 4, name => 'pull 3';
 
 test {
   my $c = shift;
@@ -497,7 +497,7 @@ test {
     done $c;
     undef $c;
   });
-} n => 4, name => 'pull';
+} n => 4, name => 'pull 4';
 
 test {
   my $c = shift;
@@ -514,7 +514,7 @@ test {
     done $c;
     undef $c;
   });
-} n => 1, name => 'pull';
+} n => 1, name => 'pull 5';
 
 test {
   my $c = shift;
