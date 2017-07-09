@@ -287,6 +287,82 @@ sub DESTROY ($) {
   }
 } # DESTROY
 
+package WritableStreamDefaultController;
+use Streams::_Common;
+push our @CARP_NOT, qw(WritableStream);
+
+sub new ($$$$$) {
+  my (undef, $stream, $underlying_sink, $size, $high_water_mark) = @_;
+  my $self = bless {}, $_[0];
+  die _type_error "The argument is not a WritableStream"
+      unless UNIVERSAL::isa ($stream, 'WritableStream'); # IsWritableStream
+  die _type_error "WritableStream has a controller"
+      if defined $stream->{writable_stream_controller};
+  $self->{controlled_writable_stream} = $stream;
+  $self->{underlying_sink} = $underlying_sink;
+  $self->{started} = 0;
+
+  ## ResetQueue
+  $self->{queue} = [];
+  $self->{queue_total_size} = 0;
+
+  ## ValidateAndNormalizeQueuingStrategy
+  {
+    die _type_error "Size is not a CODE"
+        if defined $size and not ref $size eq 'CODE';
+    $self->{strategy_size} = $size;
+
+    ## ValidateAndNormalizeHighWaterMark
+    $self->{strategy_hwm} = 0+$high_water_mark; ## ToNumber
+    $self->{strategy_hwm} = 0 if $high_water_mark eq 'NaN' or $high_water_mark eq 'nan'; # Not in JS
+    die _range_error "High water mark $high_water_mark is negative"
+        if $high_water_mark < 0;
+  }
+
+  $stream->_update_backpressure ($self);
+
+  ## [[StartSteps]].  In the spec, this is invoked from WritableStream::new.
+  _hashref_method_throws ($underlying_sink, 'start', [$self])->then (sub { # requires Promise
+    $self->{started} = 1;
+    WritableStreamDefaultController::_advance_queue_if_needed $self;
+  }, sub {
+    $self->{started} = 1;
+    WritableStream::_deal_with_rejection $stream, $_[0];
+  });
+
+  return $self;
+} # new
+
+sub error ($$) {
+  my $state = $_[0]->{controlled_writable_stream}->{state};
+  return undef unless $state eq 'writable';
+
+  ## WritableStreamDefaultControllerError
+  {
+    WritableStream::_start_erroring $_[0]->{controlled_writable_stream}, $_[1];
+  }
+
+  return undef;
+} # error(e)
+
+sub _abort_steps ($$) {
+  return _hashref_method ($_[0]->{underlying_sink}, 'abort', [$_[1]]);
+} # [[AbortSteps]]
+
+sub _error_steps ($) {
+  ## ResetQueue
+  $_[0]->{queue} = [];
+  $_[0]->{queue_total_size} = 0;
+} # [[ErrorSteps]]
+
+sub DESTROY ($) {
+  local $@;
+  eval { die };
+  if ($@ =~ /during global destruction/) {
+    warn "$$: Reference to @{[ref $_[0]]} is not discarded before global destruction\n";
+  }
+} # DESTROY
+
 package WritableStreamDefaultWriter;
 use Streams::_Common;
 push our @CARP_NOT, qw(WritableStream);
@@ -495,82 +571,6 @@ sub write ($$) {
 
   return $pc->{promise};
 } # write(chunk)
-
-sub DESTROY ($) {
-  local $@;
-  eval { die };
-  if ($@ =~ /during global destruction/) {
-    warn "$$: Reference to @{[ref $_[0]]} is not discarded before global destruction\n";
-  }
-} # DESTROY
-
-package WritableStreamDefaultController;
-use Streams::_Common;
-push our @CARP_NOT, qw(WritableStream);
-
-sub new ($$$$$) {
-  my (undef, $stream, $underlying_sink, $size, $high_water_mark) = @_;
-  my $self = bless {}, $_[0];
-  die _type_error "The argument is not a WritableStream"
-      unless UNIVERSAL::isa ($stream, 'WritableStream'); # IsWritableStream
-  die _type_error "WritableStream has a controller"
-      if defined $stream->{writable_stream_controller};
-  $self->{controlled_writable_stream} = $stream;
-  $self->{underlying_sink} = $underlying_sink;
-  $self->{started} = 0;
-
-  ## ResetQueue
-  $self->{queue} = [];
-  $self->{queue_total_size} = 0;
-
-  ## ValidateAndNormalizeQueuingStrategy
-  {
-    die _type_error "Size is not a CODE"
-        if defined $size and not ref $size eq 'CODE';
-    $self->{strategy_size} = $size;
-
-    ## ValidateAndNormalizeHighWaterMark
-    $self->{strategy_hwm} = 0+$high_water_mark; ## ToNumber
-    $self->{strategy_hwm} = 0 if $high_water_mark eq 'NaN' or $high_water_mark eq 'nan'; # Not in JS
-    die _range_error "High water mark $high_water_mark is negative"
-        if $high_water_mark < 0;
-  }
-
-  $stream->_update_backpressure ($self);
-
-  ## [[StartSteps]].  In the spec, this is invoked from WritableStream::new.
-  _hashref_method_throws ($underlying_sink, 'start', [$self])->then (sub { # requires Promise
-    $self->{started} = 1;
-    WritableStreamDefaultController::_advance_queue_if_needed $self;
-  }, sub {
-    $self->{started} = 1;
-    WritableStream::_deal_with_rejection $stream, $_[0];
-  });
-
-  return $self;
-} # new
-
-sub error ($$) {
-  my $state = $_[0]->{controlled_writable_stream}->{state};
-  return undef unless $state eq 'writable';
-
-  ## WritableStreamDefaultControllerError
-  {
-    WritableStream::_start_erroring $_[0]->{controlled_writable_stream}, $_[1];
-  }
-
-  return undef;
-} # error(e)
-
-sub _abort_steps ($$) {
-  return _hashref_method ($_[0]->{underlying_sink}, 'abort', [$_[1]]);
-} # [[AbortSteps]]
-
-sub _error_steps ($) {
-  ## ResetQueue
-  $_[0]->{queue} = [];
-  $_[0]->{queue_total_size} = 0;
-} # [[ErrorSteps]]
 
 sub DESTROY ($) {
   local $@;
