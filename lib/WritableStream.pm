@@ -37,12 +37,6 @@ sub locked ($) {
   return defined $_[0]->{writer}; # IsWritableStreamLocked
 } # locked
 
-sub abort ($$) {
-  return Promise->reject (_type_error "WritableStream is locked")
-      if defined $_[0]->{writer}; # IsWritableStreamLocked
-  return $_[0]->_abort ($_[1]);
-} # abort
-
 sub get_writer ($) {
   ## AcquireWritableStreamDefaultWriter
   return WritableStreamDefaultWriter->new ($_[0]);
@@ -150,7 +144,7 @@ sub WritableStream::_deal_with_rejection ($$) {
   WritableStream::_finish_erroring $stream;
 } # WritableStreamDealWithRejection
 
-## This is not a public method but can be used to implement
+## This is not a public function but can be used to implement
 ## specification operations invoking WritableStreamAbort.
 sub WritableStream::_abort ($$) {
   ## WritableStreamAbort
@@ -176,6 +170,12 @@ sub WritableStream::_abort ($$) {
       unless $was_already_erroring;
   return $p->{promise};
 } # _abort
+
+sub abort ($$) {
+  return Promise->reject (_type_error "WritableStream is locked")
+      if defined $_[0]->{writer}; # IsWritableStreamLocked
+  return WritableStream::_abort $_[0], $_[1];
+} # abort
 
 sub WritableStreamDefaultController::_process_close ($) {
   my $controller = $_[0];
@@ -368,16 +368,17 @@ use Streams::_Common;
 push our @CARP_NOT, qw(WritableStream);
 
 sub new ($$) {
-  my $self = bless {}, $_[0];
   my $stream = $_[1];
   die _type_error "The argument is not a WritableStream"
       unless UNIVERSAL::isa ($stream, 'WritableStream'); # IsWritableStream
   die _type_error "WritableStream is locked"
       if defined $stream->{writer}; # IsWritableStreamLocked
-  $self->{owner_writable_stream} = $stream;
-  $stream->{writer} = $self;
-  $self->{ready_promise} = _promise_capability;
-  $self->{closed_promise} = _promise_capability;
+  my $writer = {};
+  my $self = bless \$stream, $_[0];
+  #$writer->{owner_writable_stream} = $stream;
+  $stream->{writer} = $writer;
+  $writer->{ready_promise} = _promise_capability;
+  $writer->{closed_promise} = _promise_capability;
   if ($stream->{state} eq 'writable') {
     if (
       not
@@ -388,31 +389,31 @@ sub new ($$) {
     ) {
       #
     } else {
-      $self->{ready_promise}->{resolve}->(undef);
+      $writer->{ready_promise}->{resolve}->(undef);
     }
   } elsif ($stream->{state} eq 'erroring') {
-    $self->{ready_promise}->{reject}->($stream->{stored_error});
-    $self->{ready_promise}->{promise}->manakai_set_handled;
+    $writer->{ready_promise}->{reject}->($stream->{stored_error});
+    $writer->{ready_promise}->{promise}->manakai_set_handled;
   } elsif ($stream->{state} eq 'closed') {
-    $self->{ready_promise}->{resolve}->(undef);
-    $self->{closed_promise}->{resolve}->(undef);
+    $writer->{ready_promise}->{resolve}->(undef);
+    $writer->{closed_promise}->{resolve}->(undef);
   } else {
     my $stored_error = $stream->{stored_error};
-    $self->{ready_promise}->{reject}->($stream->{stored_error});
-    $self->{ready_promise}->{promise}->manakai_set_handled;
-    $self->{closed_promise}->{reject}->($stream->{stored_error});
-    $self->{closed_promise}->{promise}->manakai_set_handled;
+    $writer->{ready_promise}->{reject}->($stream->{stored_error});
+    $writer->{ready_promise}->{promise}->manakai_set_handled;
+    $writer->{closed_promise}->{reject}->($stream->{stored_error});
+    $writer->{closed_promise}->{promise}->manakai_set_handled;
   }
   return $self;
 } # new
 
 sub closed ($) {
-  return $_[0]->{closed_promise}->{promise};
+  return ${$_[0]}->{writer}->{closed_promise}->{promise};
 } # closed
 
 sub desired_size ($) {
-  my $stream = $_[0]->{owner_writable_stream};
-  die _type_error "Writer's lock is released" unless defined $stream;
+  my $stream = ${$_[0]}; #${$_[0]}->{writer}->{owner_writable_stream};
+  die _type_error "Writer's lock is released" unless defined $stream->{state};
 
   ## WritableStreamDefaultWriterGetDesiredSize
   {
@@ -430,22 +431,24 @@ sub desired_size ($) {
 } # desired_size
 
 sub ready ($) {
-  return $_[0]->{ready_promise}->{promise};
+  return ${$_[0]}->{writer}->{ready_promise}->{promise};
 } # ready
 
 sub abort ($$) {
+  my $writer = ${$_[0]}->{writer};
   return Promise->reject (_type_error "Writer's lock is released")
-      unless defined $_[0]->{owner_writable_stream};
+      unless defined ${$_[0]}->{state}; #$writer->{owner_writable_stream};
 
   ## WritableStreamDefaultWriterAbort
-  return $_[0]->{owner_writable_stream}->_abort ($_[1]);
+  return WritableStream::_abort ${$_[0]}, $_[1];
+  #return WritableStream::_abort $writer->{owner_writable_stream}, $_[1];
 } # abort
 
 sub close ($) {
-  my $writer = $_[0];
-  my $stream = $writer->{owner_writable_stream};
+  my $writer = ${$_[0]}->{writer};
+  my $stream = ${$_[0]}; #$writer->{owner_writable_stream};
   return Promise->reject (_type_error "Writer's lock is released")
-      unless defined $stream;
+      unless defined $stream->{state};
   return Promise->reject (_type_error "WritableStream is closed")
       if
       ## WritableStreamCloseQueuedOrInFlight
@@ -478,8 +481,8 @@ sub close ($) {
 } # close
 
 sub release_lock ($) {
-  my $writer = $_[0];
-  return undef unless defined $writer->{owner_writable_stream};
+  my $writer = ${$_[0]}->{writer};
+  return undef unless defined ${$_[0]}->{state}; #$writer->{owner_writable_stream};
 
   ## WritableStreamDefaultWriterRelease
   {
@@ -495,19 +498,21 @@ sub release_lock ($) {
     $writer->{closed_promise}->{reject}->($released_error);
     $writer->{closed_promise}->{promise}->manakai_set_handled;
 
-    $writer->{owner_writable_stream}->{writer} = undef;
-    $writer->{owner_writable_stream} = undef;
+    ${$_[0]}->{writer} = undef;
+    ${$_[0]} = {writer => $writer};
+    #$writer->{owner_writable_stream}->{writer} = undef;
+    #$writer->{owner_writable_stream} = undef;
     return undef;
   }
 } # release_lock
 
 sub write ($$) {
+  my $writer = ${$_[0]}->{writer};
   return Promise->reject (_type_error "Writer's lock is released")
-      unless defined $_[0]->{owner_writable_stream};
+      unless defined ${$_[0]}->{state}; #$writer->{owner_writable_stream};
 
   ## WritableStreamDefaultWriterWrite
-  my $writer = $_[0];
-  my $stream = $writer->{owner_writable_stream};
+  my $stream = ${$_[0]}; #$writer->{owner_writable_stream};
   my $controller = $stream->{writable_stream_controller};
 
   ## WritableStreamDefaultControllerGetChunkSize
@@ -524,8 +529,10 @@ sub write ($$) {
   }
 
   return Promise->reject (_type_error "Writer's lock is released")
-      unless defined $writer->{owner_writable_stream} and
-             $stream eq $writer->{owner_writable_stream};
+      unless defined ${$_[0]}->{state} and
+             ${$_[0]}->{writer} eq $writer;
+  #    unless defined $writer->{owner_writable_stream} and
+  #           $stream eq $writer->{owner_writable_stream};
 
   my $state = $stream->{state};
   return Promise->reject ($stream->{stored_error}) if $state eq 'errored';
@@ -584,6 +591,7 @@ sub DESTROY ($) {
 
 # XXX documentation
 # XXX loop
+#   [13] [14]
 
 =head1 LICENSE
 
