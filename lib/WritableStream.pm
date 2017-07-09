@@ -357,7 +357,7 @@ sub new ($$$$$) {
       if defined $stream->{writable_stream_controller};
   my $controller = {};
   #$controller->{controlled_writable_stream} = $stream;
-  my $self = bless \$stream, $_[0];
+  my $controller_obj = bless \$stream, $_[0];
   $controller->{underlying_sink} = $underlying_sink;
   $controller->{started} = 0;
 
@@ -380,8 +380,12 @@ sub new ($$$$$) {
 
   $stream->_update_backpressure ($controller);
 
+  ## In spec, done within WritableStream constructor
+  $stream->{writable_stream_controller} = $controller;
+  weaken ($stream->{controller_obj} = $controller_obj);
+
   ## [[StartSteps]].  In the spec, this is invoked from WritableStream::new.
-  _hashref_method_throws ($underlying_sink, 'start', [$self])->then (sub { # requires Promise
+  _hashref_method_throws ($underlying_sink, 'start', [$controller_obj])->then (sub { # requires Promise
     $controller->{started} = 1;
     WritableStreamDefaultController::_advance_queue_if_needed
         $stream; #$controller;
@@ -390,11 +394,7 @@ sub new ($$$$$) {
     WritableStream::_deal_with_rejection $stream, $_[0];
   });
 
-  ## In spec, done within WritableStream constructor
-  $stream->{writable_stream_controller} = $controller;
-  weaken ($stream->{controller_obj} = $self);
-
-  return $self;
+  return $controller_obj;
 } # new
 
 sub error ($$) {

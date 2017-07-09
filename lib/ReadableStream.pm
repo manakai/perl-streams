@@ -2,6 +2,7 @@ package ReadableStream;
 use strict;
 use warnings;
 our $VERSION = '1.0';
+use Scalar::Util qw(weaken);
 use ArrayBuffer;
 use TypedArray;
 use DataView;
@@ -68,8 +69,12 @@ sub ReadableStream::_cancel ($$) {
     return Promise->reject ($stream->{stored_error});
   }
   ReadableStream::_close $stream;
-  my $source_cancel_promise = $stream->{controller_obj}->_cancel_steps ($_[1]);
-  return $source_cancel_promise->then (sub { return undef });
+  my $controller_obj = $stream->{controller_obj};
+  unless (defined $controller_obj) {
+    weaken ($stream->{controller_obj} = bless \$stream, $stream->{controller_class});
+    $controller_obj = $stream->{controller_obj};
+  }
+  return $controller_obj->_cancel_steps ($_[1])->then (sub { return undef });
 } # ReadableStreamCancel
 
 sub cancel ($;$) {
@@ -109,12 +114,13 @@ sub DESTROY ($) {
 } # DESTROY
 
 package ReadableStreamDefaultController;
+use Scalar::Util qw(weaken);
 use Streams::_Common;
 push our @CARP_NOT, qw(ReadableStream);
 
-sub ReadableStreamDefaultController::_get_desired_size ($) {
+sub ReadableStreamDefaultController::_get_desired_size ($$) {
   my $controller = $_[0];
-  my $stream = $controller->{controlled_readable_stream};
+  my $stream = $_[1]; #$controller->{controlled_readable_stream};
   my $state = $stream->{state};
   return undef if $state eq 'errored';
   return 0 if $state eq 'closed';
@@ -142,9 +148,9 @@ sub ReadableStream::_error ($$) {
   # $reader->{closed_promise}->{promise_is_handled} = 1;
 } # ReadableStreamError
 
-sub ReadableStreamDefaultController::_error ($$) {
+sub ReadableStreamDefaultController::_error ($$$) {
   my $controller = $_[0];
-  my $stream = $controller->{controlled_readable_stream};
+  my $stream = $_[2]; #$controller->{controlled_readable_stream};
 
   ## ResetQueue
   $controller->{queue} = [];
@@ -153,9 +159,9 @@ sub ReadableStreamDefaultController::_error ($$) {
   ReadableStream::_error $stream, $_[1];
 } # ReadableByteStreamControllerError
 
-sub ReadableStreamDefaultController::_call_pull_if_needed ($) {
+sub ReadableStreamDefaultController::_call_pull_if_needed ($$) {
   my $controller = $_[0];
-  my $stream = $controller->{controlled_readable_stream};
+  my $stream = $_[1]; #$controller->{controlled_readable_stream};
 
   {
     ## return unless ReadableStreamDefaultControllerShouldCallPull
@@ -169,7 +175,8 @@ sub ReadableStreamDefaultController::_call_pull_if_needed ($) {
         ) > 0) {
       last;
     }
-    my $desired_size = ReadableStreamDefaultController::_get_desired_size $controller;
+    my $desired_size = ReadableStreamDefaultController::_get_desired_size
+        $controller, $stream;
     return unless $desired_size > 0;
   }
 
@@ -179,17 +186,22 @@ sub ReadableStreamDefaultController::_call_pull_if_needed ($) {
   }
   $controller->{pulling} = 1;
   my $controller_obj = $stream->{controller_obj};
+  unless (defined $controller_obj) {
+    weaken ($stream->{controller_obj} = bless \$stream, $stream->{controller_class});
+    $controller_obj = $stream->{controller_obj};
+  }
   _hashref_method ($controller->{underlying_source}, 'pull', [$controller_obj])->then (sub {
     $controller->{pulling} = 0;
     if ($controller->{pull_again}) {
       $controller->{pull_again} = 0;
-      ReadableStreamDefaultController::_call_pull_if_needed ($controller);
+      ReadableStreamDefaultController::_call_pull_if_needed
+          ($controller, $stream);
     }
     return undef;
   }, sub {
     ## ReadableStreamDefaultControllerErrorIfNeeded
     if ($stream->{state} eq 'readable') {
-      ReadableStreamDefaultController::_error ($controller, $_[0]);
+      ReadableStreamDefaultController::_error ($controller, $_[0], $stream);
     }
   });
   return undef;
@@ -203,9 +215,7 @@ sub new ($$$$$) {
       if defined $stream->{readable_stream_controller};
   my $controller = {};
   my $controller_obj = bless \$stream, $class;
-  $stream->{controller_obj} = $controller_obj;
-  $stream->{readable_stream_controller} = $controller;
-  $controller->{controlled_readable_stream} = $stream;
+  #$controller->{controlled_readable_stream} = $stream;
   $controller->{underlying_source} = $underlying_source;
 
   ## ResetQueue
@@ -232,24 +242,31 @@ sub new ($$$$$) {
 
   _hashref_method_throws ($underlying_source, 'start', [$controller_obj])->then (sub { # requires Promise
     $controller->{started} = 1;
-    ReadableStreamDefaultController::_call_pull_if_needed $controller;
+    ReadableStreamDefaultController::_call_pull_if_needed
+        $controller, $stream;
   }, sub {
     ## ReadableStreamDefaultControllerErrorIfNeeded
-    if ($controller->{controlled_readable_stream}->{state} eq 'readable') {
-      ReadableStreamDefaultController::_error ($controller, $_[0]);
+    if ($stream->{state} eq 'readable') {
+      ReadableStreamDefaultController::_error ($controller, $_[0], $stream);
     }
   });
+
+  ## In spec, done within ReadableStream constructor
+  $stream->{readable_stream_controller} = $controller;
+  weaken ($stream->{controller_obj} = $controller_obj);
+  $stream->{controller_class} = $_[0];
+
   return $controller_obj;
 } # new
 
 sub desired_size ($) {
   return ReadableStreamDefaultController::_get_desired_size
-      ${$_[0]}->{readable_stream_controller};
+      ${$_[0]}->{readable_stream_controller}, ${$_[0]};
 } # desired_size
 
 sub close ($) {
   my $controller = ${$_[0]}->{readable_stream_controller};
-  my $stream = $controller->{controlled_readable_stream};
+  my $stream = ${$_[0]}; #$controller->{controlled_readable_stream};
   die _type_error "ReadableStream is closed" if $controller->{close_requested};
   die _type_error "ReadableStream is closed"
       unless $stream->{state} eq 'readable';
@@ -263,7 +280,7 @@ sub close ($) {
 
 sub enqueue ($$) {
   my $controller = ${$_[0]}->{readable_stream_controller};
-  my $stream = $controller->{controlled_readable_stream};
+  my $stream = ${$_[0]}; #$controller->{controlled_readable_stream};
   die _type_error "ReadableStream is closed" if $controller->{close_requested};
   die _type_error "ReadableStream is closed"
       unless $stream->{state} eq 'readable';
@@ -283,8 +300,8 @@ sub enqueue ($$) {
       $chunk_size = eval { $controller->{strategy_size}->($_[1]) };
       if ($@) {
         ## ReadableStreamDefaultControllerErrorIfNeeded
-        if ($controller->{controlled_readable_stream}->{state} eq 'readable') {
-          ReadableStreamDefaultController::_error ($controller, $@);
+        if ($stream->{state} eq 'readable') {
+          ReadableStreamDefaultController::_error ($controller, $@, $stream);
         }
 
         die $@;
@@ -295,8 +312,8 @@ sub enqueue ($$) {
     my $size = eval { _to_size $chunk_size, 'Size' };
     if ($@) {
       ## ReadableStreamDefaultControllerErrorIfNeeded
-      if ($controller->{controlled_readable_stream}->{state} eq 'readable') {
-        ReadableStreamDefaultController::_error ($controller, $@);
+      if ($stream->{state} eq 'readable') {
+        ReadableStreamDefaultController::_error ($controller, $@, $stream);
       }
 
       die $@;
@@ -304,7 +321,7 @@ sub enqueue ($$) {
     push @{$controller->{queue}}, {value => $_[1], size => $size};
     $controller->{queue_total_size} += $size;
   }
-  ReadableStreamDefaultController::_call_pull_if_needed $controller;
+  ReadableStreamDefaultController::_call_pull_if_needed $controller, $stream;
   return undef;
 } # enqueue(chunk)
 
@@ -313,7 +330,7 @@ sub error ($$) {
   die _type_error "ReadableStream is closed"
       unless $stream->{state} eq 'readable';
   ReadableStreamDefaultController::_error
-      ${$_[0]}->{readable_stream_controller}, $_[1];
+      ${$_[0]}->{readable_stream_controller}, $_[1], $stream;
   return undef;
 } # error(e)
 
@@ -329,7 +346,7 @@ sub _cancel_steps ($$) {
 
 sub _pull_steps ($) {
   my $controller = ${$_[0]}->{readable_stream_controller};
-  my $stream = $controller->{controlled_readable_stream};
+  my $stream = ${$_[0]}; #$controller->{controlled_readable_stream};
   if (@{$controller->{queue}}) {
     ## DequeueValue
     my $pair = shift @{$controller->{queue}};
@@ -339,7 +356,8 @@ sub _pull_steps ($) {
     if ($controller->{close_requested} and not @{$controller->{queue}}) {
       ReadableStream::_close $stream;
     } else {
-      ReadableStreamDefaultController::_call_pull_if_needed $controller;
+      ReadableStreamDefaultController::_call_pull_if_needed
+          $controller, $stream;
     }
     return Promise->resolve ({value => $pair->{value}}); # CreateIterResultObject
   }
@@ -348,7 +366,7 @@ sub _pull_steps ($) {
   my $p = _promise_capability;
   push @{$stream->{reader}->{read_requests}}, {promise => $p};
 
-  ReadableStreamDefaultController::_call_pull_if_needed $controller;
+  ReadableStreamDefaultController::_call_pull_if_needed $controller, $stream;
   return $p->{promise};
 } # [[PullSteps]]
 
@@ -361,6 +379,7 @@ sub DESTROY ($) {
 } # DESTROY
 
 package ReadableByteStreamController;
+use Scalar::Util qw(weaken);
 use Streams::_Common;
 push our @CARP_NOT, qw(ReadableStream);
 
@@ -372,8 +391,10 @@ sub ReadableByteStreamController::_invalidate_byob_request ($) {
 } # ReadableByteStreamControllerInvalidateBYOBRequest
 
 sub ReadableByteStreamController::_error ($$) {
-  my $controller = $_[0];
-  my $stream = $controller->{controlled_readable_stream};
+  #my $controller = $_[0];
+  #my $stream = $controller->{controlled_readable_stream};
+  my $stream = $_[0];
+  my $controller = $stream->{readable_stream_controller};
 
   ## ReadableByteStreamControllerClearPendingPullIntos
   ReadableByteStreamController::_invalidate_byob_request $controller;
@@ -387,16 +408,21 @@ sub ReadableByteStreamController::_error ($$) {
 } # ReadableByteStreamControllerError
 
 sub ReadableByteStreamController::_get_desired_size ($) {
-  my $controller = $_[0];
-  my $stream = $controller->{controlled_readable_stream};
+  #my $controller = $_[0];
+  #my $stream = $controller->{controlled_readable_stream};
+  my $stream = $_[0];
+  my $controller = $stream->{readable_stream_controller};
+
   return undef if $stream->{state} eq 'errored';
   return 0 if $stream->{state} eq 'closed';
   return $controller->{strategy_hwm} - $controller->{queue_total_size};
 } ## ReadableByteStreamControllerGetDesiredSize
 
 sub ReadableByteStreamController::_call_pull_if_needed ($) {
-  my $controller = $_[0];
-  my $stream = $controller->{controlled_readable_stream};
+  #my $controller = $_[0];
+  #my $stream = $controller->{controlled_readable_stream};
+  my $stream = $_[0];
+  my $controller = $stream->{readable_stream_controller};
 
   {
     ## return unless ReadableByteStreamControllerShouldCallPull
@@ -425,7 +451,8 @@ sub ReadableByteStreamController::_call_pull_if_needed ($) {
     ) {
       last;
     }
-    if (ReadableByteStreamController::_get_desired_size ($controller) > 0) {
+    #if (ReadableByteStreamController::_get_desired_size ($controller) > 0) {
+    if (ReadableByteStreamController::_get_desired_size ($stream) > 0) {
       last;
     }
     return;
@@ -437,15 +464,21 @@ sub ReadableByteStreamController::_call_pull_if_needed ($) {
   }
   $controller->{pulling} = 1;
   my $controller_obj = $stream->{controller_obj};
+  unless (defined $controller_obj) {
+    weaken ($stream->{controller_obj} = bless \$stream, $stream->{controller_class});
+    $controller_obj = $stream->{controller_obj};
+  }
   _hashref_method ($controller->{underlying_byte_source}, 'pull', [$controller_obj])->then (sub {
     $controller->{pulling} = 0;
     if ($controller->{pull_again}) {
       $controller->{pull_again} = 0;
-      ReadableByteStreamController::_call_pull_if_needed ($controller);
+      ReadableByteStreamController::_call_pull_if_needed ($stream);
+      #ReadableByteStreamController::_call_pull_if_needed ($controller);
     }
   }, sub {
     if ($stream->{state} eq 'readable') {
-      ReadableByteStreamController::_error $controller, $_[0];
+      ReadableByteStreamController::_error $stream, $_[0];
+      #ReadableByteStreamController::_error $controller, $_[0];
     }
   });
   return undef;
@@ -457,9 +490,7 @@ sub new ($$$$) {
       if defined $stream->{readable_stream_controller};
   my $controller = {};
   my $controller_obj = bless \$stream, $class;
-  $stream->{controller_obj} = $controller_obj;
-  $stream->{readable_stream_controller} = $controller;
-  $controller->{controlled_readable_stream} = $stream;
+  #$controller->{controlled_readable_stream} = $stream;
   $controller->{underlying_byte_source} = $underlying_byte_source;
   $controller->{pull_again} = 0;
   $controller->{pulling} = 0;
@@ -493,12 +524,20 @@ sub new ($$$$) {
   $controller->{pending_pull_intos} = [];
   _hashref_method_throws ($underlying_byte_source, 'start', [$controller_obj])->then (sub {
     $controller->{started} = 1;
-    ReadableByteStreamController::_call_pull_if_needed $controller;
+    ReadableByteStreamController::_call_pull_if_needed $stream;
+    #ReadableByteStreamController::_call_pull_if_needed $controller;
   }, sub {
     if ($stream->{state} eq 'readable') {
-      ReadableByteStreamController::_error $controller, $_[0];
+      ReadableByteStreamController::_error $stream, $_[0];
+      #ReadableByteStreamController::_error $controller, $_[0];
     }
   });
+
+  ## In spec, done within ReadableStream constructor
+  $stream->{readable_stream_controller} = $controller;
+  weaken ($stream->{controller_obj} = $controller_obj);
+  $stream->{controller_class} = $_[0];
+
   return $controller_obj;
 } # new
 
@@ -518,13 +557,14 @@ sub byob_request ($) {
 } # byob_request
 
 sub desired_size ($) {
-  return ReadableByteStreamController::_get_desired_size
-      ${$_[0]}->{readable_stream_controller};
+  return ReadableByteStreamController::_get_desired_size ${$_[0]};
+  #return ReadableByteStreamController::_get_desired_size
+  #    ${$_[0]}->{readable_stream_controller};
 } # desired_size
 
 sub close ($) {
   my $controller = ${$_[0]}->{readable_stream_controller};
-  my $stream = $controller->{controlled_readable_stream};
+  my $stream = ${$_[0]}; #$controller->{controlled_readable_stream};
   die _type_error "ReadableStream is closed" if $controller->{close_requested};
   die _type_error "ReadableStream is closed"
       unless $stream->{state} eq 'readable';
@@ -538,7 +578,8 @@ sub close ($) {
     my $first_pending_pull_into = $controller->{pending_pull_intos}->[0];
     if ($first_pending_pull_into->{bytes_filled} > 0) {
       my $e = _type_error "There is a pending read request";
-      ReadableByteStreamController::_error $controller, $e;
+      ReadableByteStreamController::_error $stream, $e;
+      #ReadableByteStreamController::_error $controller, $e;
       die $e;
     }
   }
@@ -613,8 +654,9 @@ sub ReadableByteStreamController::_commit_pull_into_descriptor ($$) {
   }
 } # ReadableByteStreamControllerCommitPullIntoDescriptor
 
-sub ReadableByteStreamController::_process_pull_into_descriptors_using_queue ($) {
+sub ReadableByteStreamController::_process_pull_into_descriptors_using_queue ($$) {
   my $controller = $_[0];
+  my $stream = $_[1];
   while (@{$controller->{pending_pull_intos}}) {
     return if $controller->{queue_total_size} == 0;
     my $pull_into_descriptor = $controller->{pending_pull_intos}->[0];
@@ -625,22 +667,22 @@ sub ReadableByteStreamController::_process_pull_into_descriptors_using_queue ($)
       ReadableByteStreamController::_invalidate_byob_request $controller;
 
       ReadableByteStreamController::_commit_pull_into_descriptor
-          $controller->{controlled_readable_stream}, $pull_into_descriptor;
+          $stream, $pull_into_descriptor;
     }
   }
 } # ReadableByteStreamControllerProcessPullIntoDescriptorsUsingQueue
 
 sub enqueue ($$) {
   my $controller = ${$_[0]}->{readable_stream_controller};
+  my $stream = ${$_[0]}; #$controller->{controlled_readable_stream};
   die _type_error "ReadableStream is closed" if $controller->{close_requested};
   die _type_error "ReadableStream is closed"
-      unless $controller->{controlled_readable_stream}->{state} eq 'readable';
+      unless $stream->{state} eq 'readable';
   die _type_error "The argument is not an ArrayBufferView"
       unless UNIVERSAL::isa ($_[1], 'TypedArray') or
              UNIVERSAL::isa ($_[1], 'DataView'); # has [[ViewedArrayBuffer]]
 
   ## ReadableByteStreamControllerEnqueue
-  my $stream = $controller->{controlled_readable_stream};
   my $buffer = $_[1]->{viewed_array_buffer};
   my $byte_offset = $_[1]->{byte_offset};
   my $byte_length = $_[1]->{byte_length};
@@ -680,7 +722,8 @@ sub enqueue ($$) {
     };
     $controller->{queue_total_size} += $byte_length;
 
-    ReadableByteStreamController::_process_pull_into_descriptors_using_queue $controller;
+    ReadableByteStreamController::_process_pull_into_descriptors_using_queue
+        $controller, $stream;
   } else {
     ## ReadableByteStreamControllerEnqueueChunkToQueue
     push @{$controller->{queue}}, {
@@ -697,8 +740,8 @@ sub error ($$) {
   die _type_error "ReadableStream is closed"
       unless ${$_[0]}->{state} eq 'readable';
       #unless $_[0]->{controlled_readable_stream}->{state} eq 'readable';
-  ReadableByteStreamController::_error
-      ${$_[0]}->{readable_stream_controller}, $_[1];
+  ReadableByteStreamController::_error ${$_[0]}, $_[1];
+  #ReadableByteStreamController::_error ${$_[0]}->{readable_stream_controller}, $_[1];
   return undef;
 } # error(e)
 
@@ -719,7 +762,7 @@ sub _cancel_steps ($$) {
 
 sub _pull_steps ($) {
   my $controller = ${$_[0]}->{readable_stream_controller};
-  my $stream = $controller->{controlled_readable_stream};
+  my $stream = ${$_[0]}; #$controller->{controlled_readable_stream};
   if ($controller->{queue_total_size}) {
     my $entry = shift @{$controller->{queue}};
     $controller->{queue_total_size} -= $entry->{byte_length};
@@ -727,9 +770,10 @@ sub _pull_steps ($) {
     ## ReadableByteStreamControllerHandleQueueDrain
     if ($controller->{queue_total_size} == 0 and
         $controller->{close_requested}) {
-      ReadableStream::_close $controller->{controlled_readable_stream};
+      ReadableStream::_close $stream;
     } else {
-      ReadableByteStreamController::_call_pull_if_needed $controller;
+      ReadableByteStreamController::_call_pull_if_needed $stream;
+      #ReadableByteStreamController::_call_pull_if_needed $controller;
     }
 
     my $view = TypedArray::Uint8Array->new
@@ -752,7 +796,8 @@ sub _pull_steps ($) {
   my $p = _promise_capability;
   push @{$stream->{reader}->{read_requests}}, {promise => $p};
 
-  ReadableByteStreamController::_call_pull_if_needed $controller;
+  #ReadableByteStreamController::_call_pull_if_needed $controller;
+  ReadableByteStreamController::_call_pull_if_needed $stream;
   return $p->{promise};
 } # [[PullSteps]
 
@@ -768,10 +813,10 @@ package ReadableStreamBYOBRequest;
 use Streams::_Common;
 push our @CARP_NOT, qw(ReadableStream);
 
-sub ReadableByteStreamController::_respond_internal ($$) {
+sub ReadableByteStreamController::_respond_internal ($$$) {
   my $controller = $_[0];
+  my $stream = $_[2]; #$controller->{controlled_readable_stream};
   my $first_descriptor = $controller->{pending_pull_intos}->[0];
-  my $stream = $controller->{controlled_readable_stream};
   if ($stream->{state} eq 'closed') {
     die _type_error "ReadableStream is closed" unless $_[1] == 0;
 
@@ -825,16 +870,19 @@ sub ReadableByteStreamController::_respond_internal ($$) {
     $first_descriptor->{buffer} = $first_descriptor->{buffer}->_transfer;
     $first_descriptor->{bytes_filled} -= $remainder_size;
     ReadableByteStreamController::_commit_pull_into_descriptor 
-        $controller->{controlled_readable_stream}, $first_descriptor;
-    ReadableByteStreamController::_process_pull_into_descriptors_using_queue $controller;
+        $stream, $first_descriptor;
+    ReadableByteStreamController::_process_pull_into_descriptors_using_queue
+        $controller, $stream;
   }
 } # ReadableByteStreamControllerRespondInternal
 
 sub new ($$$) {
   my $self = bless {}, $_[0];
-  $self->{associated_readable_byte_stream_controller}
-      = ${$_[1]}->{readable_stream_controller}
-          if UNIVERSAL::isa ($_[1], 'ReadableByteStreamController'); # No "if" in spec
+  if (UNIVERSAL::isa ($_[1], 'ReadableByteStreamController')) { # No "if" in spec
+    $self->{associated_readable_byte_stream_controller}
+        = ${$_[1]}->{readable_stream_controller};
+    $self->{stream} = ${$_[1]}; # Not in JS
+  }
   $self->{view} = $_[2];
   return $self;
 } # new
@@ -850,7 +898,7 @@ sub respond ($$) {
   ## ReadableByteStreamControllerRespond
   my $bytes_written = _to_size $_[1], 'Byte length';
   ReadableByteStreamController::_respond_internal
-      $_[0]->{associated_readable_byte_stream_controller}, $bytes_written;
+      $_[0]->{associated_readable_byte_stream_controller}, $bytes_written, $_[0]->{stream};
   return undef;
 } # respond(bytesWritten)
 
@@ -872,7 +920,7 @@ sub manakai_respond_by_sysread ($$) {
   ## ReadableByteStreamControllerRespond
   #my $bytes_written = _to_size $bytes_read, 'Byte length';
   ReadableByteStreamController::_respond_internal
-      $_[0]->{associated_readable_byte_stream_controller}, $bytes_read;
+      $_[0]->{associated_readable_byte_stream_controller}, $bytes_read, $_[0]->{stream};
 
   return $bytes_read;
 } # manakai_respond_by_sysread
@@ -893,7 +941,7 @@ sub respond_with_new_view ($$) {
       unless $first_descriptor->{byte_length} == $_[1]->{byte_length};
   $first_descriptor->{buffer} = $_[1]->{viewed_array_buffer};
   ReadableByteStreamController::_respond_internal
-      $controller, $_[1]->{byte_length};
+      $controller, $_[1]->{byte_length}, $_[0]->{stream};
   return undef;
 } # respondWithNewView(view)
 
@@ -915,7 +963,7 @@ sub manakai_respond_with_new_view ($$) {
   $first_descriptor->{buffer} = $_[1]->{viewed_array_buffer};
   $first_descriptor->{byte_length} = $_[1]->{byte_length};
   ReadableByteStreamController::_respond_internal
-      $controller, $_[1]->{byte_length};
+      $controller, $_[1]->{byte_length}, $_[0]->{stream};
   return undef;
 } # manakai_respond_with_new_value
 
@@ -928,6 +976,7 @@ sub DESTROY ($) {
 } # DESTROY
 
 package ReadableStreamDefaultReader;
+use Scalar::Util qw(weaken);
 use Streams::_Common;
 push our @CARP_NOT, qw(ReadableStream);
 
@@ -970,7 +1019,12 @@ sub read ($) {
   } elsif ($stream->{state} eq 'errored') {
     return Promise->reject ($stream->{stored_error});
   }
-  return $stream->{controller_obj}->_pull_steps;
+  my $controller_obj = $stream->{controller_obj};
+  unless (defined $controller_obj) {
+    weaken ($stream->{controller_obj} = bless \$stream, $stream->{controller_class});
+    $controller_obj = $stream->{controller_obj};
+  }
+  return $controller_obj->_pull_steps;
 } # read
 
 sub closed ($) {
@@ -1127,16 +1181,18 @@ sub read ($$) {
         ## ReadableByteStreamControllerHandleQueueDrain
         if ($controller->{queue_total_size} == 0 and
             $controller->{close_requested}) {
-          ReadableStream::_close $controller->{controlled_readable_stream};
+          ReadableStream::_close $stream;
         } else {
-          ReadableByteStreamController::_call_pull_if_needed $controller;
+          ReadableByteStreamController::_call_pull_if_needed $stream;
+          #ReadableByteStreamController::_call_pull_if_needed $controller;
         }
 
         return Promise->resolve ({value => $filled_view}); # CreateIterResultObject
       }
       if ($controller->{close_requested}) {
         my $e = _type_error "ReadableStream is closed";
-        ReadableByteStreamController::_error $controller, $e;
+        ReadableByteStreamController::_error $stream, $e;
+        #ReadableByteStreamController::_error $controller, $e;
         return Promise->reject ($e);
       }
     }
@@ -1147,7 +1203,8 @@ sub read ($$) {
     my $read_into_request = {promise => _promise_capability};
     push @{$stream->{reader}->{read_into_requests}}, $read_into_request;
 
-    ReadableByteStreamController::_call_pull_if_needed $controller;
+    ReadableByteStreamController::_call_pull_if_needed $stream;
+    #ReadableByteStreamController::_call_pull_if_needed $controller;
     return $read_into_request->{promise}->{promise};
   }
 } # read
