@@ -664,6 +664,32 @@ test {
 
 test {
   my $c = shift;
+  my @read = map { DataView->new (ArrayBuffer->new_from_scalarref (\$_)) } ("abc", "def");
+  my $rs = ReadableStream->new ({
+    type => 'bytes',
+    pull => sub {
+      $_[1]->enqueue ($_) for @read;
+      return $_[1]->close;
+    },
+  });
+  my $r = $rs->get_reader;
+  my $result = '';
+  $r->read->then (sub { $result .= ${$_[0]->{value}->buffer->manakai_transfer_to_scalarref} });
+  $r->read->then (sub { $result .= ${$_[0]->{value}->buffer->manakai_transfer_to_scalarref} });
+  $r->closed->then (sub {
+    test {
+      is $result, "abcdef";
+    } $c;
+  }, sub {
+    test { ok 0 } $c;
+  })->then (sub {
+    done $c;
+    undef $c;
+  });
+} n => 1, name => 'ReadableStream default reader + binary stream';
+
+test {
+  my $c = shift;
   my $rs = ReadableStream->new ({
     type => 'bytes',
     pull => sub {
