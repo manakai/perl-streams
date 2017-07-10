@@ -256,6 +256,8 @@ sub ReadableStreamDefaultController::_call_pull_if_needed ($$) {
     ## ReadableStreamDefaultControllerErrorIfNeeded
     if ($stream->{state} eq 'readable') {
       ReadableStreamDefaultController::_error ($controller, $_[0], $stream);
+    } else {
+      warn "Uncaught exception: $_[0]";
     }
   });
   return undef;
@@ -540,6 +542,8 @@ sub ReadableByteStreamController::_call_pull_if_needed ($) {
     if ($stream->{state} eq 'readable') {
       ReadableByteStreamController::_error $stream, $_[0];
       #ReadableByteStreamController::_error $controller, $_[0];
+    } else {
+      warn "Uncaught exception: $_[0]";
     }
   });
   return undef;
