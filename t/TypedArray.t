@@ -31,8 +31,9 @@ for (
     is $ta->buffer->byte_length, $ta->byte_length;
     is $ta->BYTES_PER_ELEMENT, 1;
     is +TypedArray::Uint8Array->BYTES_PER_ELEMENT, 1;
+    isa_ok $ta, 'ArrayBufferView';
     done $c;
-  } n => 8, name => [$class, 'no argument'];
+  } n => 9, name => [$class, 'no argument'];
 
   test {
     my $c = shift;

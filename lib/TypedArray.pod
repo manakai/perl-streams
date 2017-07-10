@@ -17,6 +17,12 @@ There is the following class: L<TypedArray::Uint8Array>, which can be
 loaded by C<use TypedArray>.  (Other Typed Array classes are not
 supported yet.)
 
+Any object which is an instance of a Typed Array class is a
+L<TypedArray>.  In addition, it is an L<ArrayBufferView>.  That is:
+
+  isa_ok $uint8array, 'TypedArray';
+  isa_ok $uint8array, 'DataView';
+
 =head1 METHODS
 
 Following methods are available:

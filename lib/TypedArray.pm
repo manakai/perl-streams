@@ -2,6 +2,7 @@ package TypedArray;
 use strict;
 use warnings;
 our $VERSION = '1.0';
+push our @ISA, qw(ArrayBufferView);
 use Streams::_Common;
 use ArrayBuffer;
 

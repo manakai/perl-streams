@@ -11,8 +11,9 @@ test {
   my $ab = ArrayBuffer->new (0);
   isa_ok $ab, 'ArrayBuffer';
   is $ab->byte_length, 0;
+  ok not $ab->isa ('ArrayBufferView');
   done $c;
-} n => 2, name => 'new 0';
+} n => 3, name => 'new 0';
 
 test {
   my $c = shift;

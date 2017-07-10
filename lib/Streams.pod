@@ -36,6 +36,9 @@ Typed Array API, which consists of following modules:
 
 =back
 
+For convinience, L<TypedArray> and L<DataView> objects are instances
+of the L<ArrayBufferView> class.
+
 There is also a module: L<Streams::IOError>.
 
 =head1 QUEUING STRATEGY

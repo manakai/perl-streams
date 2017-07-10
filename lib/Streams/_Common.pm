@@ -93,6 +93,8 @@ sub _hashref_method ($$$) {
 } # _hashref_method
 push @EXPORT, qw(_hashref_method);
 
+package ArrayBufferView;
+
 1;
 
 =head1 LICENSE

@@ -3,6 +3,7 @@ use strict;
 use warnings;
 our $VERSION = '1.0';
 use Streams::_Common;
+push our @ISA, qw(ArrayBufferView);
 
 sub new ($$;$$) {
   my $self = bless {}, $_[0];

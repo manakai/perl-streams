@@ -746,8 +746,7 @@ sub enqueue ($$) {
   die _type_error "ReadableStream is closed"
       unless $stream->{state} eq 'readable';
   die _type_error "The argument is not an ArrayBufferView"
-      unless UNIVERSAL::isa ($_[1], 'TypedArray') or
-             UNIVERSAL::isa ($_[1], 'DataView'); # has [[ViewedArrayBuffer]]
+      unless UNIVERSAL::isa ($_[1], 'ArrayBufferView'); # has [[ViewedArrayBuffer]]
 
   ## ReadableByteStreamControllerEnqueue
   my $buffer = $_[1]->{viewed_array_buffer};
@@ -1010,8 +1009,7 @@ sub respond_with_new_view ($$) {
       unless defined ${$_[0]}->{state};
       #unless defined $_[0]->{associated_readable_byte_stream_controller};
   die _type_error "The argument is not an ArrayBufferView"
-      unless UNIVERSAL::isa ($_[1], 'TypedArray') or
-             UNIVERSAL::isa ($_[1], 'DataView'); # has [[ViewedArrayBuffer]]
+      unless UNIVERSAL::isa ($_[1], 'ArrayBufferView'); # has [[ViewedArrayBuffer]]
 
   ## ReadableByteStreamControllerRespondWithNewView
   #my $controller = $_[0]->{associated_readable_byte_stream_controller};
@@ -1033,8 +1031,7 @@ sub manakai_respond_with_new_view ($$) {
       unless defined ${$_[0]}->{state};
       #unless defined $_[0]->{associated_readable_byte_stream_controller};
   die _type_error "The argument is not an ArrayBufferView"
-      unless UNIVERSAL::isa ($_[1], 'TypedArray') or
-             UNIVERSAL::isa ($_[1], 'DataView'); # has [[ViewedArrayBuffer]]
+      unless UNIVERSAL::isa ($_[1], 'ArrayBufferView'); # has [[ViewedArrayBuffer]]
 
   ## A modified version of ReadableByteStreamControllerRespondWithNewView
   #my $controller = $_[0]->{associated_readable_byte_stream_controller};
@@ -1209,8 +1206,7 @@ sub read ($$) {
   return Promise->reject (_type_error "Reader's lock is released")
       unless defined $stream->{state};
   return Promise->reject (_type_error "The argument is not an ArrayBufferView")
-      unless UNIVERSAL::isa ($view, 'TypedArray') or
-             UNIVERSAL::isa ($view, 'DataView'); # has [[ViewedArrayBuffer]]
+      unless UNIVERSAL::isa ($view, 'ArrayBufferView'); # has [[ViewedArrayBuffer]]
   return Promise->reject (_type_error "The ArrayBufferView is empty")
       if $view->{byte_length} == 0;
 

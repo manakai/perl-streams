@@ -15,8 +15,9 @@ test {
   is $dv->byte_offset, 0;
   is $dv->byte_length, $ab->byte_length;
   is $dv->buffer, $ab;
+  isa_ok $dv, 'ArrayBufferView';
   done $c;
-} n => 4, name => 'new arraybuffer';
+} n => 5, name => 'new arraybuffer';
 
 test {
   my $c = shift;
