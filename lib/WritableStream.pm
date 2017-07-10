@@ -340,7 +340,11 @@ sub DESTROY ($) {
   if ($@ =~ /during global destruction/) {
     my $location = $_[0]->{created_location};
     $location =~ s/\.?\s+\z//;
-    warn "$$: Reference to @{[ref $_[0]]} created${location} is not discarded before global destruction\n";
+    my $diag = '';
+    if ($_[0]->{state} eq 'writable') {
+      $diag = ' (Stream is not closed)';
+    }
+    warn "$$: Reference to @{[ref $_[0]]} created${location} is not discarded before global destruction$diag\n";
   }
 } # DESTROY
 
@@ -421,13 +425,13 @@ sub _error_steps ($) {
   $controller->{queue_total_size} = 0;
 } # [[ErrorSteps]]
 
-sub DESTROY ($) {
-  local $@;
-  eval { die };
-  if ($@ =~ /during global destruction/) {
-    warn "$$: Reference to @{[ref $_[0]]} is not discarded before global destruction\n";
-  }
-} # DESTROY
+#sub DESTROY ($) {
+#  local $@;
+#  eval { die };
+#  if ($@ =~ /during global destruction/) {
+#    warn "$$: Reference to @{[ref $_[0]]} is not discarded before global destruction\n";
+#  }
+#} # DESTROY
 
 package WritableStreamDefaultWriter;
 use Streams::_Common;

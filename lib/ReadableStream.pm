@@ -93,7 +93,6 @@ sub ReadableStream::_close ($) {
       }
       $reader->{read_requests} = [];
     }
-
     $reader->{closed_promise}->{resolve}->(undef);
   }
 } # ReadableStreamClose
@@ -158,7 +157,11 @@ sub DESTROY ($) {
   if ($@ =~ /during global destruction/) {
     my $location = $_[0]->{created_location};
     $location =~ s/\.?\s+\z//;
-    warn "$$: Reference to @{[ref $_[0]]} created${location} is not discarded before global destruction\n";
+    my $diag = '';
+    if ($_[0]->{state} eq 'readable') {
+      $diag = ' (Stream is not closed)';
+    }
+    warn "$$: Reference to @{[ref $_[0]]} created${location} is not discarded before global destruction$diag\n";
   }
 } # DESTROY
 
@@ -424,13 +427,13 @@ sub _pull_steps ($) {
   return $p->{promise};
 } # [[PullSteps]]
 
-sub DESTROY ($) {
-  local $@;
-  eval { die };
-  if ($@ =~ /during global destruction/) {
-    warn "$$: Reference to @{[ref $_[0]]} is not discarded before global destruction\n";
-  }
-} # DESTROY
+#sub DESTROY ($) {
+#  local $@;
+#  eval { die };
+#  if ($@ =~ /during global destruction/) {
+#    warn "$$: Reference to @{[ref $_[0]]} is not discarded before global destruction\n";
+#  }
+#} # DESTROY
 
 package ReadableByteStreamController;
 use Scalar::Util qw(weaken);
@@ -615,7 +618,7 @@ sub byob_request ($) {
   }
   if (defined $controller->{byob_request} and
       not defined $controller->{byob_request_obj}) {
-    my $req = bless \$stream, $_[0];
+    my $req = bless \$stream, 'ReadableStreamBYOBRequest';
     weaken ($controller->{byob_request_obj} = $req);
     return $req;
   }
@@ -868,13 +871,13 @@ sub _pull_steps ($) {
   return $p->{promise};
 } # [[PullSteps]
 
-sub DESTROY ($) {
-  local $@;
-  eval { die };
-  if ($@ =~ /during global destruction/) {
-    warn "$$: Reference to @{[ref $_[0]]} is not discarded before global destruction\n";
-  }
-} # DESTROY
+#sub DESTROY ($) {
+#  local $@;
+#  eval { die };
+#  if ($@ =~ /during global destruction/) {
+#    warn "$$: Reference to @{[ref $_[0]]} is not discarded before global destruction\n";
+#  }
+#} # DESTROY
 
 package ReadableStreamBYOBRequest;
 use Scalar::Util qw(weaken);
@@ -996,10 +999,12 @@ sub manakai_respond_by_sysread ($$) {
   ## Note that sysread can truncate array_buffer_data and
   ## ArrayBuffer's internal status might become inconsitent.
 
-  ## ReadableByteStreamControllerRespond
-  #my $bytes_written = _to_size $bytes_read, 'Byte length';
-  ReadableByteStreamController::_respond_internal ${$_[0]}, $bytes_read;
-      #$_[0]->{associated_readable_byte_stream_controller}, $bytes_read;
+  if ($bytes_read) {
+    ## ReadableByteStreamControllerRespond
+    #my $bytes_written = _to_size $bytes_read, 'Byte length';
+    ReadableByteStreamController::_respond_internal ${$_[0]}, $bytes_read;
+        #$_[0]->{associated_readable_byte_stream_controller}, $bytes_read;
+  }
 
   return $bytes_read;
 } # manakai_respond_by_sysread
@@ -1049,10 +1054,12 @@ sub manakai_respond_with_new_view ($$) {
 } # manakai_respond_with_new_value
 
 sub DESTROY ($) {
-  local $@;
-  eval { die };
-  if ($@ =~ /during global destruction/) {
-    warn "$$: Reference to @{[ref $_[0]]} is not discarded before global destruction\n";
+  unless (defined ${$_[0]}->{state}) { # not detached
+    local $@;
+    eval { die };
+    if ($@ =~ /during global destruction/) {
+      warn "$$: Reference to @{[ref $_[0]]} is not discarded before global destruction\n";
+    }
   }
 } # DESTROY
 
@@ -1321,8 +1328,6 @@ sub DESTROY ($) {
 } # DESTROY
 
 1;
-
-# XXX documentation
 
 =head1 LICENSE
 

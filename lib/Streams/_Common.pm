@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use Carp;
 use Streams::IOError;
-push our @CARP_NOT, qw(Streams::IOError);
+push our @CARP_NOT, qw(Streams::IOError Promise);
 
 our @EXPORT;
 
@@ -63,6 +63,7 @@ sub _to_size ($$) {
 } # _to_size
 push @EXPORT, qw(_to_size);
 
+# requires Promise
 sub _promise_capability () {
   my ($resolve, $reject);
   my $promise = Promise->new (sub { ($resolve, $reject) = @_ });
