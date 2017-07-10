@@ -301,9 +301,12 @@ test {
   eval {
     TypedArray::Uint8Array->new_by_sysread ($fh, 13);
   };
-  like $@, qr{^TypeError: .+ at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
+  like $@, qr{^Perl I/O error: .+ at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
+  isa_ok $@, 'Streams::IOError';
+  ok $@->errno;
+  ok $@->message;
   done $c;
-} n => 1, name => 'new_by_sysread fh error';
+} n => 4, name => 'new_by_sysread fh error';
 
 test {
   my $c = shift;

@@ -662,6 +662,29 @@ test {
   });
 } n => 1, name => 'ReadableStream reference discarded before read';
 
+test {
+  my $c = shift;
+  my $rs = ReadableStream->new ({
+    type => 'bytes',
+    pull => sub {
+      open my $fh, '<', \"";
+      $_[1]->byob_request->manakai_respond_by_sysread ($fh, 13);
+    },
+  });
+  my $r = $rs->get_reader ('byob');
+  $r->read (DataView->new (ArrayBuffer->new (4)))->catch (sub {
+    my $e = $_[0];
+    test {
+      like $e, qr{^Perl I/O error: .+ at \Q@{[__FILE__]}\E line \Q@{[__LINE__-7]}\E};
+      isa_ok $e, 'Streams::IOError';
+      ok $e->errno;
+      ok $e->message;
+    } $c;
+    done $c;
+    undef $c;
+  });
+} n => 4, name => 'manakai_respond_by_sysread fh error';
+
 run_tests;
 
 =head1 LICENSE

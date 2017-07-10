@@ -58,7 +58,8 @@ The first argument must be a Perl filehandle.  The second argument
 must be a maximum number of bytes to read.  These are used as
 arguments to the C<sysread>.
 
-This method throws if the C<sysread> call fails.
+This method throws a L<Streams::IOError> object if the C<sysread> call
+fails.
 
 =item $arraybuffer = $ta->buffer
 

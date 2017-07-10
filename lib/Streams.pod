@@ -36,6 +36,8 @@ Typed Array API, which consists of following modules:
 
 =back
 
+There is also a module: L<Streams::IOError>.
+
 =head1 QUEUING STRATEGY
 
 Both L<ReadableStream> and L<WritableStream> constructors receive

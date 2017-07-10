@@ -139,7 +139,7 @@ sub new_by_sysread ($$) {
   my ($class, $fh, $byte_length) = @_;
   my $buffer = '';
   my $bytes_read = sysread $fh, $buffer, (_to_index $byte_length, 'Byte length'), 0;
-  die TypedArray::_type_error $! unless defined $bytes_read;
+  die _io_error $! unless defined $bytes_read;
   return $class->new
       (ArrayBuffer->new_from_scalarref (\$buffer), 0, $bytes_read);
 } # new_by_sysread

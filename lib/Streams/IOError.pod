@@ -1,0 +1,55 @@
+=head1 NAME
+
+Streams::IOError - An error of Perl read/write operations
+
+=head1 SYNOPSIS
+
+  use Streams::IOError;
+  $error = Streams::IOError->new ($!);
+  warn $error->errno;
+  warn $error->message;
+  die $error;
+
+=head1 DESCRIPTION
+
+The C<Streams::IOError> class can be used to wrap a Perl's I/O error
+value (i.e. C<$!>) to be treated as an exception object.
+
+=head1 METHODS
+
+There are following methods:
+
+=over 4
+
+=item $error = Streams::IOError->new ($!);
+
+Create and return a new L<Streams::IOError> object.  The argument must
+be a dual value (i.e. a value that can be evaluated both as a number
+and as a string.
+
+=item $number = $error->errno
+
+The error number.
+
+=item $string = $error->message
+
+The error message.
+
+=item $string = '' . $error
+
+A short string describing the error object.
+
+=back
+
+=head1 AUTHOR
+
+Wakaba <wakaba@suikawiki.org>.
+
+=head1 LICENSE
+
+Copyright 2017 Wakaba <wakaba@suikawiki.org>.
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut

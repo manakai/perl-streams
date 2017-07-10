@@ -993,7 +993,7 @@ sub manakai_respond_by_sysread ($$) {
   my $bytes_read = sysread $_[1],
       ${$view->buffer->{array_buffer_data}},
       $view->byte_length, $view->byte_offset;
-  die _type_error $! unless defined $bytes_read;
+  die _io_error $! unless defined $bytes_read;
   ## Note that sysread can truncate array_buffer_data and
   ## ArrayBuffer's internal status might become inconsitent.
 
