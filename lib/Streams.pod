@@ -1,0 +1,109 @@
+=head1 NAME
+
+Streams - Streams for Perl
+
+=head1 SYNOPSIS
+
+  use Streams;
+  $rs = ReadableStream->new (...);
+  $ws = WritableStream->new (...);
+
+=head1 DESCRIPTION
+
+The C<Streams> module loads L<ReadableStream> and L<WritableStream>
+classes and additional utilities.
+
+By C<use>ing this module, following classes are available:
+
+=over 4
+
+=item L<ReadableStream>
+
+=item L<WritableStream>
+
+=back
+
+The perl-streams Git repository also has a subset of Perl variant of
+Typed Array API, which consists of following modules:
+
+=over 4
+
+=item L<ArrayBuffer>
+
+=item L<TypedArray>
+
+=item L<DataView>
+
+=back
+
+=head1 QUEUING STRATEGY
+
+Both L<ReadableStream> and L<WritableStream> constructors receive
+optional queuing strategy.  A queuing strategy is a hash reference
+with two key/value pairs:
+
+=over 4
+
+=item high_water_mark => $number
+
+The expected queue size.  The value must be a positive number.
+
+=item size => CODE
+
+A CODE returning the size of a chunk.
+
+The code is invoked with an argument.  The code is expected to return
+the size of that value.
+
+=back
+
+Following functions constructing queuing strategies are available:
+
+=over 4
+
+=item $strategy = Streams::ByteLengthQueuingStrategy {high_water_mark => $number}
+
+Return a new queuing strategy using byte length of chunks.  The
+argument must be a hash reference whose C<high_water_mark> is the
+expected byte length of the buffer.
+
+=item $strategy = Streams::CountingQueuingStrategy {high_water_mark => $number}
+
+Return a new queuing strategy using the number of chunks.  The
+argument must be a hash reference whose C<high_water_mark> is the
+expected number of chunks in the queue.
+
+=back
+
+These are expected to be equivalent to JavaScript Streams API, as
+specified by WHATWG Streams Standard.
+
+=head1 DEPENDENCY
+
+Perl 5.8 or later is required.  The L<Scalar::Util> module, which is a
+core module, is required.
+
+These modules depend on L<Promise>
+<https://github.com/wakaba/perl-promise>.
+
+=head1 AVAILABILITY
+
+The latest version of these modules are available at
+<https://github.com/manakai/perl-streams>.
+
+=head1 SEE ALSO
+
+Streams Standard <https://streams.spec.whatwg.org/>.
+
+=head1 AUTHOR
+
+Wakaba <wakaba@suikawiki.org>.
+
+=head1 LICENSE
+
+Copyright 2017 Wakaba <wakaba@suikawiki.org>.
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut

@@ -95,7 +95,8 @@ integer.  If the value is not defined, no auto-allocation is done.
 
 =back
 
-The second argument must be a queuing strategy or C<undef>.
+The second argument must be a queuing strategy (L<Streams/"QUEUING
+STRATEGY">) or C<undef>.
 
 The C<start> and C<pull> codes receive the B<controller> object
 I<$controller>, which has following method:
