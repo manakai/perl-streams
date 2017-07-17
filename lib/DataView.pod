@@ -57,6 +57,13 @@ Return the number of the bytes in the view of the L<DataView>.
 This method throws if the L<ArrayBuffer> of the L<DataView> is
 detached.
 
+=item $bytes = $ta->manakai_to_string
+
+Return a copy of byte string represented by the view.
+
+This method throws if the L<ArrayBuffer> of the L<DataView> is
+detached.
+
 =back
 
 =head1 SEE ALSO

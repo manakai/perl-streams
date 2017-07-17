@@ -128,6 +128,38 @@ test {
   done $c;
 } n => 2, name => 'arraybuffer detached';
 
+test {
+  my $c = shift;
+  my $ab = ArrayBuffer->new (42);
+  my $dv = DataView->new ($ab, 4, 6);
+  is $dv->manakai_to_string, "\x00" x 6;
+  my $dv2 = DataView->new ($ab, 4, 0);
+  is $dv2->manakai_to_string, "";
+  done $c;
+} n => 2, name => 'manakai_to_string ArrayBuffer allocation_delayed';
+
+test {
+  my $c = shift;
+  my $ab = ArrayBuffer->new_from_scalarref (\"aehash566453zdewae4444");
+  my $dv = DataView->new ($ab, 4, 6);
+  is $dv->manakai_to_string, "sh5664";
+  my $dv2 = DataView->new ($ab, 4, 0);
+  is $dv2->manakai_to_string, "";
+  done $c;
+} n => 2, name => 'manakai_to_string';
+
+test {
+  my $c = shift;
+  my $ab = ArrayBuffer->new_from_scalarref (\"aehash566453zdewae4444");
+  my $dv = DataView->new ($ab, 4, 6);
+  $ab->_transfer; # detach
+  eval {
+    $dv->manakai_to_string;
+  };
+  like $@, qr{^TypeError: ArrayBuffer is detached at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
+  done $c;
+} n => 1, name => 'manakai_to_string';
+
 run_tests;
 
 =head1 LICENSE

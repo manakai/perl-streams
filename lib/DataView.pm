@@ -53,6 +53,21 @@ sub byte_offset ($) {
   return $self->{byte_offset};
 } # byte_offset
 
+sub manakai_to_string ($) {
+  my $self = $_[0];
+  die _type_error "ArrayBuffer is detached"
+      if not defined $self->{viewed_array_buffer}
+          ->{array_buffer_data}; ## IsDetachedBuffer
+
+  my $buffer = $self->{viewed_array_buffer};
+  if ($buffer->{allocation_delayed}) {
+    return "\x00" x $self->{byte_length};
+  } else {
+    return substr ${$buffer->{array_buffer_data}},
+        $self->{byte_offset}, $self->{byte_length};
+  }
+} # manakai_to_string
+
 ## Not implemented yet:
 ##   $object->get_* set_*
 
