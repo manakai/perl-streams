@@ -688,7 +688,6 @@ sub ReadableByteStreamController::_fill_pull_into_descriptor_from_queue ($$) {
         $pull_into_descriptor->{buffer}, $dest_start,
         $head_of_queue->{buffer}, $head_of_queue->{byte_offset},
         $bytes_to_copy;
-    # XXX debug info for buffer copying
 
     if ($head_of_queue->{byte_length} == $bytes_to_copy) {
       shift @{$queue};
@@ -858,6 +857,7 @@ sub _pull_steps ($) {
   if (defined $auto_allocate_chunk_size) {
     my $buffer = eval { ArrayBuffer->new ($auto_allocate_chunk_size) };
     return Promise->reject ($@) if $@;
+    $buffer->manakai_label ('auto-allocation');
     push @{$controller->{pending_pull_intos}}, {
       buffer => $buffer,
       byte_offset => 0, byte_length => $auto_allocate_chunk_size,
@@ -1004,6 +1004,8 @@ sub manakai_respond_by_sysread ($$) {
   ## ArrayBuffer's internal status might become inconsitent.
 
   if ($bytes_read) {
+    _note_buffer_copy $bytes_read, 'sysread', $view->buffer->debug_info;
+
     ## ReadableByteStreamControllerRespond
     #my $bytes_written = _to_size $bytes_read, 'Byte length';
     ReadableByteStreamController::_respond_internal ${$_[0]}, $bytes_read;

@@ -94,6 +94,19 @@ sub _hashref_method ($$$) {
 } # _hashref_method
 push @EXPORT, qw(_hashref_method);
 
+if ($ENV{STREAMS_DEBUG}) {
+  eval q{
+    sub _note_buffer_copy ($$$) {
+      warn sprintf "Buffer copy l=%d from %s to %s\n",
+          $_[0], $_[1], $_[2];
+    } # _note_buffer_copy
+    1;
+   } or die $@;
+} else {
+  eval q{ sub _note_buffer_copy ($$$) { } 1 } or die $@;
+}
+push @EXPORT, qw(_note_buffer_copy);
+
 package ArrayBufferView;
 
 1;

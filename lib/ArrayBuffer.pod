@@ -50,6 +50,18 @@ L<ArrayBuffer> data block.
 
 This method can no longer be used once the L<ArrayBuffer> is detached.
 
+=item $string = $buffer->manakai_label
+
+=item $buffer->manakai_label ($string)
+
+Get or set the label of the buffer.  Any string can be set as the
+label.  It is used as part of C<debug_info>.  The default is C<undef>.
+
+=item $string = $buffer->debug_info
+
+Return a string describing the buffer, which might or might not be
+useful for development.
+
 =back
 
 =head1 SEE ALSO

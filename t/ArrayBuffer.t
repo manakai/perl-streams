@@ -420,6 +420,20 @@ test {
   done $c;
 } n => 4, name => '_copy_data_block_bytes allocated -> allocated';
 
+test {
+  my $c = shift;
+  my $ab = ArrayBuffer->new;
+  is $ab->manakai_label, undef;
+  $ab->manakai_label (0);
+  is $ab->manakai_label, '0';
+  $ab->manakai_label ('');
+  is $ab->manakai_label, '';
+  my $v1 = rand;
+  $ab->manakai_label ($v1);
+  like $ab->debug_info, qr{\Q$v1\E};
+  done $c;
+} n => 4, name => 'manakai_label';
+
 run_tests;
 
 =head1 LICENSE
