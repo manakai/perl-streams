@@ -35,11 +35,24 @@ The error number.
 
 The error message.
 
+=item $string = $error->file_name
+
+Return the file name of the location of the error.
+
+=item $number = $error->line_number
+
+Return the line number, in the file, of the location of the error.
+
 =item $string = '' . $error
 
 A short string describing the error object.
 
 =back
+
+An instance of the C<Web::DOM::Exception> class is implementing the
+Perl Error Object Interface Level 1 (see L<Web::DOM::Error/ERROR
+OBJECT API>
+<https://github.com/manakai/perl-web-dom/blob/master/lib/Web/DOM/Error.pod#error-object-api>).
 
 =head1 AUTHOR
 

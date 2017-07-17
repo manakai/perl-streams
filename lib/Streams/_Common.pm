@@ -2,8 +2,12 @@ package Streams::_Common;
 use strict;
 use warnings;
 use Carp;
+use Streams::TypeError;
+use Streams::RangeError;
 use Streams::IOError;
-push our @CARP_NOT, qw(Streams::IOError Promise);
+push our @CARP_NOT, qw(
+  Streams::TypeError Streams::RangeError Streams::IOError Promise
+);
 
 our @EXPORT;
 
@@ -20,18 +24,9 @@ sub import ($;@) {
   push @{$to_class.'::CARP_NOT'}, $from_class;
 } # import
 
-$Streams::CreateTypeError ||= sub ($$) {
-  return "TypeError: " . $_[1] . Carp::shortmess ();
-};
-$Streams::CreateRangeError ||= sub ($$) {
-  return "RangeError: " . $_[1] . Carp::shortmess ();
-};
-$Streams::CreateIOError ||= sub ($$) {
-  return Streams::IOError->new ($_[1]);
-};
-sub _type_error ($) { $Streams::CreateTypeError->(undef, $_[0]) }
-sub _range_error ($) { $Streams::CreateRangeError->(undef, $_[0]) }
-sub _io_error ($) { $Streams::CreateIOError->(undef, $_[0]) }
+sub _type_error ($) { Streams::TypeError->new ($_[0]) }
+sub _range_error ($) { Streams::RangeError->new ($_[0]) }
+sub _io_error ($) { Streams::IOError->new ($_[0]) }
 push @EXPORT, qw(_type_error _range_error _io_error);
 
 ## c.f. <http://search.cpan.org/~rjbs/perl-5.20.0/pod/perldelta.pod#Better_64-bit_support>

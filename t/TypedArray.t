@@ -187,8 +187,13 @@ for (
       $class->new ($ab);
     };
     like $@, qr{^TypeError: ArrayBuffer is detached at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
+    isa_ok $@, 'Streams::TypeError';
+    is $@->name, 'TypeError';
+    is $@->message, 'ArrayBuffer is detached';
+    is $@->file_name, __FILE__;
+    is $@->line_number, __LINE__-7;
     done $c;
-  } n => 1, name => [$class, 'ArrayBuffer is detached'];
+  } n => 6, name => [$class, 'ArrayBuffer is detached'];
 
   test {
     my $c = shift;
@@ -304,10 +309,13 @@ test {
   };
   like $@, qr{^Perl I/O error: .+ at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
   isa_ok $@, 'Streams::IOError';
+  is $@->name, 'Perl I/O error';
   ok $@->errno;
   ok $@->message;
+  is $@->file_name, __FILE__;
+  is $@->line_number, __LINE__-8;
   done $c;
-} n => 4, name => 'new_by_sysread fh error';
+} n => 7, name => 'new_by_sysread fh error';
 
 test {
   my $c = shift;

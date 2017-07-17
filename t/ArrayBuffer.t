@@ -77,8 +77,13 @@ test {
     ArrayBuffer->new (-32);
   };
   like $@, qr{^RangeError: Byte length -32 is negative at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
+  isa_ok $@, 'Streams::RangeError';
+  is $@->name, 'RangeError';
+  is $@->message, 'Byte length -32 is negative';
+  is $@->file_name, __FILE__;
+  is $@->line_number, __LINE__-7;
   done $c;
-} n => 1, name => 'new negative';
+} n => 6, name => 'new negative';
 
 test {
   my $c = shift;

@@ -68,6 +68,14 @@ test {
   done $c;
 } n => 4, name => 'CountQueuingStrategy';
 
+test {
+  my $c = shift;
+  ok $Web::DOM::Error::L1ObjectClass->{'Streams::TypeError'};
+  ok $Web::DOM::Error::L1ObjectClass->{'Streams::RangeError'};
+  ok $Web::DOM::Error::L1ObjectClass->{'Streams::IOError'};
+  done $c;
+} n => 3, name => 'error classes';
+
 run_tests;
 
 =head1 LICENSE
