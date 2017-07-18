@@ -1,0 +1,64 @@
+=head1 NAME
+
+Streams::Devel - Additional features for application developers
+
+=head1 SYNOPSIS
+
+  # script.pl
+  use Streams::Devel;
+  note_buffer_copy 23, "source buffer", "dest buffer";
+
+  $ STREAMS_DEBUG=1 perl script.pl
+
+=head1 DESCRIPTION
+
+The C<Streams::Devel> class implements additional features for
+application developers.
+
+=head1 FUNCTION
+
+By C<use>ing the module, the following function is exported:
+
+=over 4
+
+=item note_buffer_copy $byte_length, $src_label, $dest_label
+
+This function should be invoked immediately before or after the
+copying of a (possibly large) chunk of bytes for the purpose of
+logging and analysing.
+
+This function is implicitly invoked from Typed Array and Streams
+modules whenever necessary.
+
+The first argument must be the number of the bytes copied.
+
+The second argument must be a short character string describing the
+source of the copying operation.
+
+The third argument must be a short character string describing the
+destination of the copying operation.
+
+=back
+
+=head1 ENVIRONMENT VARIABLE
+
+If the C<STREAMS_DEBUG> environment variable is set to a true value
+when the module is loaded, a short line describing the buffer copy is
+printed to the standard error output.
+
+=head1 SEE ALSO
+
+L<Streams>.
+
+=head1 AUTHOR
+
+Wakaba <wakaba@suikawiki.org>.
+
+=head1 LICENSE
+
+Copyright 2017 Wakaba <wakaba@suikawiki.org>.
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut
