@@ -4,6 +4,7 @@ use warnings;
 our $VERSION = '1.0';
 use Carp;
 use Streams::_Common;
+use Streams::IOError;
 
 ## {array_buffer_data}'s value is a Data Block.  In Perl, it is
 ## represented as a reference to a byte string.
@@ -160,6 +161,23 @@ sub byte_length ($) {
       if not defined $self->{array_buffer_data}; ## IsDetachedBuffer
   return $self->{array_buffer_byte_length};
 } # byte_length
+
+## Not in JS
+sub manakai_syswrite ($$;$$) {
+  my $self = $_[0];
+  die _type_error ('ArrayBuffer is detached')
+      if not defined $self->{array_buffer_data}; ## IsDetachedBuffer
+  my $length = defined $_[2] ? (_to_index $_[2], 'Byte length') : $self->{array_buffer_byte_length};
+  my $offset = _to_index $_[3] || 0, 'Byte offset';
+  my $l = syswrite $_[1], (
+    $self->{allocation_delayed}
+      ? "\x00" x $length
+      : ${$self->{array_buffer_data}}
+  ), $length, $offset;
+  die Streams::IOError->new ($!) unless defined $l;
+  _note_buffer_copy $l, $self->debug_info, 'syswrite' if $l > 0;
+  return $l;
+} # manakai_syswrite
 
 ## Not in JS
 sub debug_info ($) {

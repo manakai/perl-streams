@@ -50,6 +50,25 @@ L<ArrayBuffer> data block.
 
 This method can no longer be used once the L<ArrayBuffer> is detached.
 
+=item $byte_length = $buffer->manakai_syswrite ($fh[, $length[, $offset]])
+
+Invoke Perl's C<syswrite> with the buffer's data and return the result
+of C<syswrite> (i.e. the number of bytes written).
+
+The first argument must be a filehandle.
+
+The second argument, if specified, must be the byte length to write.
+The default is the number of the bytes in the buffer (after the
+offset).
+
+The third argument, if specified, must be the byte offset of the
+written data in the buffer.  The default is zero.
+
+This method can no longer be used once the L<ArrayBuffer> is detached.
+
+This method throws a L<Streams::IOError> object if the C<syswrite>
+call fails.
+
 =item $string = $buffer->manakai_label
 
 =item $buffer->manakai_label ($string)

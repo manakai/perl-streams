@@ -5,6 +5,7 @@ use lib glob path (__FILE__)->parent->parent->child ('t_deps/modules/*/lib');
 use Test::More;
 use Test::X1;
 use ArrayBuffer;
+use File::Temp qw(tempfile);
 
 test {
   my $c = shift;
@@ -438,6 +439,115 @@ test {
   like $ab->debug_info, qr{\Q$v1\E};
   done $c;
 } n => 4, name => 'manakai_label';
+
+test {
+  my $c = shift;
+  my ($fh, $file_name) = tempfile;
+  my $ab = ArrayBuffer->new (54);
+  is $ab->manakai_syswrite ($fh), 54;
+  close $fh;
+  is path ($file_name)->slurp, "\x00" x 54;
+  done $c;
+} n => 2, name => 'manakai_syswrite allocation_delayed';
+
+test {
+  my $c = shift;
+  my ($fh, $file_name) = tempfile;
+  my $data = "a4aaeeweag5ogre00e";
+  my $ab = ArrayBuffer->new_from_scalarref (\$data);
+  is $ab->manakai_syswrite ($fh), length $data;
+  close $fh;
+  is path ($file_name)->slurp, $data;
+  done $c;
+} n => 2, name => 'manakai_syswrite';
+
+test {
+  my $c = shift;
+  my ($fh, $file_name) = tempfile;
+  my $data = "a4aaeeweag5ogre00e";
+  my $ab = ArrayBuffer->new_from_scalarref (\$data);
+  is $ab->manakai_syswrite ($fh, 6), 6;
+  close $fh;
+  is path ($file_name)->slurp, substr $data, 0, 6;
+  done $c;
+} n => 2, name => 'manakai_syswrite length';
+
+test {
+  my $c = shift;
+  my ($fh, $file_name) = tempfile;
+  my $data = "a4aaeeweag5ogre00e";
+  my $ab = ArrayBuffer->new_from_scalarref (\$data);
+  is $ab->manakai_syswrite ($fh, undef, 6), -6 + length $data;
+  close $fh;
+  is path ($file_name)->slurp, substr $data, 6;
+  done $c;
+} n => 2, name => 'manakai_syswrite offset';
+
+test {
+  my $c = shift;
+  my ($fh, $file_name) = tempfile;
+  my $data = "a4aaeeweag5ogre00e";
+  my $ab = ArrayBuffer->new_from_scalarref (\$data);
+  is $ab->manakai_syswrite ($fh, 0), 0;
+  close $fh;
+  is path ($file_name)->slurp, "";
+  done $c;
+} n => 2, name => 'manakai_syswrite empty';
+
+test {
+  my $c = shift;
+  my ($fh, $file_name) = tempfile;
+  print $fh "abcde";
+  close $fh;
+  my $data = "a4aaeeweag5ogre00e";
+  my $ab = ArrayBuffer->new_from_scalarref (\$data);
+  $ab->_transfer; # detach
+  eval {
+    $ab->manakai_syswrite ($fh);
+  };
+  is $@->name, 'TypeError';
+  is $@->message, 'ArrayBuffer is detached';
+  is $@->file_name, __FILE__;
+  is $@->line_number, __LINE__-5;
+  is path ($file_name)->slurp, "abcde";
+  done $c;
+} n => 5, name => 'manakai_syswrite detached';
+
+test {
+  my $c = shift;
+  my ($fh, $file_name) = tempfile;
+  print $fh "abcde";
+  close $fh;
+  my $data = "a4aaeeweag5ogre00e";
+  my $ab = ArrayBuffer->new_from_scalarref (\$data);
+  eval {
+    $ab->manakai_syswrite ($fh, -43);
+  };
+  is $@->name, 'RangeError';
+  is $@->message, 'Byte length -43 is negative';
+  is $@->file_name, __FILE__;
+  is $@->line_number, __LINE__-5;
+  is path ($file_name)->slurp, "abcde";
+  done $c;
+} n => 5, name => 'manakai_syswrite bad length';
+
+test {
+  my $c = shift;
+  my ($fh, $file_name) = tempfile;
+  print $fh "abcde";
+  close $fh;
+  my $data = "a4aaeeweag5ogre00e";
+  my $ab = ArrayBuffer->new_from_scalarref (\$data);
+  eval {
+    $ab->manakai_syswrite ($fh, undef, -43);
+  };
+  is $@->name, 'RangeError';
+  is $@->message, 'Byte offset -43 is negative';
+  is $@->file_name, __FILE__;
+  is $@->line_number, __LINE__-5;
+  is path ($file_name)->slurp, "abcde";
+  done $c;
+} n => 5, name => 'manakai_syswrite bad offset';
 
 run_tests;
 
