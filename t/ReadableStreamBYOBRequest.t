@@ -27,6 +27,57 @@ test {
   my $rs = ReadableStream->new ({
     type => 'bytes',
     pull => sub {
+      my $rc = $_[1];
+      test {
+        my $req1 = $rc->byob_request;
+        my $view1 = $req1->view;
+        isa_ok $view1, 'TypedArray::Uint8Array';
+        my $req2 = $rc->byob_request;
+        my $view2 = $req2->view;
+        isa_ok $view2, 'TypedArray::Uint8Array';
+        is $view2, $view1;
+      } $c;
+    },
+  });
+  my $view = DataView->new (ArrayBuffer->new (2));
+  $rs->get_reader ('byob')->read ($view);
+  Promise->resolve->then (sub {
+    done $c;
+    undef $c;
+  });
+} n => 3, name => 'byob_request same view objects';
+
+test {
+  my $c = shift;
+  my $rs = ReadableStream->new ({
+    type => 'bytes',
+    pull => sub {
+      my $rc = $_[1];
+      test {
+        my $req1 = $rc->byob_request;
+        my $view1 = $req1->view;
+        isa_ok $view1, 'TypedArray::Uint8Array';
+        undef $req1;
+        my $req2 = $rc->byob_request;
+        my $view2 = $req2->view;
+        isa_ok $view2, 'TypedArray::Uint8Array';
+        is $view2, $view1;
+      } $c;
+    },
+  });
+  my $view = DataView->new (ArrayBuffer->new (2));
+  $rs->get_reader ('byob')->read ($view);
+  Promise->resolve->then (sub {
+    done $c;
+    undef $c;
+  });
+} n => 3, name => 'byob_request same view objects 2';
+
+test {
+  my $c = shift;
+  my $rs = ReadableStream->new ({
+    type => 'bytes',
+    pull => sub {
       my $req = $_[1]->byob_request;
       test {
         is $req->respond (3), undef;

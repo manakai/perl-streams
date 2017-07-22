@@ -700,6 +700,34 @@ test {
   });
 } n => 1, name => 'ReadableStream reference discarded before read';
 
+test {
+  my $c = shift;
+  my $rs = ReadableStream->new ({
+    start => sub {
+      my $rc = $_[1];
+      $rc->close;
+    },
+  });
+  my $r = $rs->get_reader;
+  my $result = '';
+  return Promise->resolve->then (sub {
+    return promised_run_until {
+      return $r->read->then (sub {
+        my $v = $_[0];
+        return 0 if $v->{done};
+        $result .= $v->{value};
+        return 1;
+      });
+    };
+  })->then (sub {
+    test {
+      is $result, "";
+    } $c;
+    done $c;
+    undef $c;
+  });
+} n => 1, name => 'read after closed';
+
 run_tests;
 
 =head1 LICENSE

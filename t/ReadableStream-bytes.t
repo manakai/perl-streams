@@ -711,6 +711,94 @@ test {
   });
 } n => 4, name => 'manakai_respond_by_sysread fh error';
 
+test {
+  my $c = shift;
+  my $rs = ReadableStream->new ({
+    type => 'bytes',
+    start => sub {
+      my $rc = $_[1];
+      $rc->close;
+    },
+  });
+  my $r = $rs->get_reader;
+  my $result = '';
+  return Promise->resolve->then (sub {
+    return promised_run_until {
+      return $r->read->then (sub {
+        my $v = $_[0];
+        return 0 if $v->{done};
+        $result .= $v->{value}->manakai_to_string;
+        return 1;
+      });
+    };
+  })->then (sub {
+    test {
+      is $result, "";
+    } $c;
+    done $c;
+    undef $c;
+  });
+} n => 1, name => 'read after closed';
+
+test {
+  my $c = shift;
+  my $rs = ReadableStream->new ({
+    type => 'bytes',
+    start => sub {
+      my $rc = $_[1];
+      $rc->close;
+    },
+  });
+  my $r = $rs->get_reader ('byob');
+  my $result = '';
+  return Promise->resolve->then (sub {
+    return promised_run_until {
+      return $r->read (DataView->new (ArrayBuffer->new (3)))->then (sub {
+        my $v = $_[0];
+        return 0 if $v->{done};
+        $result .= $v->{value}->manakai_to_string;
+        return 1;
+      });
+    };
+  })->then (sub {
+    test {
+      is $result, "";
+    } $c;
+    done $c;
+    undef $c;
+  });
+} n => 1, name => 'read after closed';
+
+test {
+  my $c = shift;
+  my $rs = ReadableStream->new ({
+    type => 'bytes',
+    start => sub {
+      my $rc = $_[1];
+      $rc->enqueue (DataView->new (ArrayBuffer->new_from_scalarref (\"abc")));
+      $rc->close;
+    },
+  });
+  my $r = $rs->get_reader ('byob');
+  my $result = '';
+  return Promise->resolve->then (sub {
+    return promised_run_until {
+      return $r->read (DataView->new (ArrayBuffer->new (3)))->then (sub {
+        my $v = $_[0];
+        return 0 if $v->{done};
+        $result .= $v->{value}->manakai_to_string;
+        return 1;
+      });
+    };
+  })->then (sub {
+    test {
+      is $result, "abc";
+    } $c;
+    done $c;
+    undef $c;
+  });
+} n => 1, name => 'read after closed';
+
 run_tests;
 
 =head1 LICENSE

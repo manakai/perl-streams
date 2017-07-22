@@ -147,7 +147,7 @@ sub get_reader ($;$) {
 sub _terminate ($) {
   my $stream = $_[0];
   delete $stream->{readable_stream_controller}->{underlying_source};
-  delete $stream->{readable_stream_controller}->{underlying_byte_source};
+  $stream->{readable_stream_controller}->{underlying_byte_source} = {};
   delete $stream->{readable_stream_controller}->{strategy_size};
 } # _terminate
 
@@ -296,6 +296,11 @@ sub new ($$$$$) {
     die _range_error "High water mark $hwm is negative" if $hwm < 0;
   }
 
+  ## In spec, done within ReadableStream constructor
+  $stream->{readable_stream_controller} = $controller;
+  weaken ($stream->{controller_obj} = $controller_obj);
+  $stream->{controller_class} = $_[0];
+
   _hashref_method_throws ($underlying_source, 'start', [$controller_obj])->then (sub { # requires Promise
     $controller->{started} = 1;
     ReadableStreamDefaultController::_call_pull_if_needed
@@ -306,11 +311,6 @@ sub new ($$$$$) {
       ReadableStreamDefaultController::_error ($controller, $_[0], $stream);
     }
   });
-
-  ## In spec, done within ReadableStream constructor
-  $stream->{readable_stream_controller} = $controller;
-  weaken ($stream->{controller_obj} = $controller_obj);
-  $stream->{controller_class} = $_[0];
 
   return $controller_obj;
 } # new
@@ -440,7 +440,10 @@ sub _pull_steps ($) {
 package ReadableByteStreamController;
 use Scalar::Util qw(weaken);
 use Streams::_Common;
-push our @CARP_NOT, qw(ReadableStream);
+push our @CARP_NOT, qw(
+  ReadableStream
+  DataView TypedArray
+);
 
 sub ReadableByteStreamController::_invalidate_byob_request ($) {
   return if not defined $_[0]->{byob_request};
@@ -587,6 +590,12 @@ sub new ($$$$) {
     $controller->{auto_allocate_chunk_size} = $size;
   }
   $controller->{pending_pull_intos} = [];
+
+  ## In spec, done within ReadableStream constructor
+  $stream->{readable_stream_controller} = $controller;
+  weaken ($stream->{controller_obj} = $controller_obj);
+  $stream->{controller_class} = $_[0];
+
   _hashref_method_throws ($underlying_byte_source, 'start', [$controller_obj])->then (sub {
     $controller->{started} = 1;
     ReadableByteStreamController::_call_pull_if_needed $stream;
@@ -597,11 +606,6 @@ sub new ($$$$) {
       #ReadableByteStreamController::_error $controller, $_[0];
     }
   });
-
-  ## In spec, done within ReadableStream constructor
-  $stream->{readable_stream_controller} = $controller;
-  weaken ($stream->{controller_obj} = $controller_obj);
-  $stream->{controller_class} = $_[0];
 
   return $controller_obj;
 } # new
@@ -886,7 +890,7 @@ sub _pull_steps ($) {
 package ReadableStreamBYOBRequest;
 use Scalar::Util qw(weaken);
 use Streams::_Common;
-push our @CARP_NOT, qw(ReadableStream);
+push our @CARP_NOT, qw(ReadableByteStreamController);
 
 sub ReadableByteStreamController::_respond_internal ($$) {
   #my $controller = $_[0];
