@@ -825,7 +825,7 @@ sub _cancel_steps ($$) {
   my $controller = ${$_[0]}->{readable_stream_controller};
 
   if (@{$controller->{pending_pull_intos}}) {
-    my $first_descriptor = $controller->{pending_pull_intos};
+    my $first_descriptor = $controller->{pending_pull_intos}->[0];
     $first_descriptor->{bytes_filled} = 0;
   }
 

@@ -728,6 +728,28 @@ test {
   });
 } n => 1, name => 'read after closed';
 
+test {
+  my $c = shift;
+  my $cancel_invoked;
+  my $rs = ReadableStream->new ({
+    type => 'bytes',
+    cancel => sub {
+      $cancel_invoked = 1;
+    },
+  });
+  my $r = $rs->get_reader ('byob');
+  $r->read (DataView->new (ArrayBuffer->new (3)));
+  $r->cancel;
+  $r->closed->then (sub {
+    test {
+      ok $cancel_invoked;
+    } $c;
+  })->then (sub {
+    done $c;
+    undef $c;
+  });
+} n => 1, name => 'cancel';
+
 run_tests;
 
 =head1 LICENSE
