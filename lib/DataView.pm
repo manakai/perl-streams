@@ -60,6 +60,7 @@ sub manakai_to_string ($) {
           ->{array_buffer_data}; ## IsDetachedBuffer
 
   my $buffer = $self->{viewed_array_buffer};
+  _note_buffer_copy $self->{byte_length}, $buffer->debug_info, "string";
   if ($buffer->{allocation_delayed}) {
     return "\x00" x $self->{byte_length};
   } else {
