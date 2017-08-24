@@ -511,7 +511,7 @@ test {
   $r->read->catch (sub {
     my $e = $_[0];
     test {
-      like $e, qr{^\QTypeError: The |pull| member is not a CODE\E}; # XXX at Promise.pm :-<
+      like $e, qr{^\QTypeError: The |pull| member is not a CODE at @{[__FILE__]} line @{[__LINE__-7]}\E};
     } $c;
   })->then (sub {
     done $c;
