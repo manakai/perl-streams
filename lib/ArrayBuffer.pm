@@ -2,19 +2,18 @@ package ArrayBuffer;
 use strict;
 use warnings;
 our $VERSION = '1.0';
-use Carp;
 use Streams::_Common;
 use Streams::IOError;
 
 ## {array_buffer_data}'s value is a Data Block.  In Perl, it is
 ## represented as a reference to a byte string.
 
+## Private
+our $CallerLevel = 0;
+
 ## ArrayBuffer constructor
 sub new ($$) {
-  my $self = bless {
-    created_location => Carp::shortmess,
-  }, $_[0];
-  $self->{created_location} =~ s/\.?\s+\z//;
+  my $self = bless {caller => [caller $CallerLevel]}, $_[0];
   my $length = _to_index $_[1], 'Byte length';
 
   ## AllocateArrayBuffer
@@ -35,10 +34,7 @@ sub new_from_scalarref ($$) {
   die _type_error "The argument is not a SCALAR"
       unless defined $_[1] and (ref $_[1] eq 'SCALAR' or ref $_[1] eq 'LVALUE');
   die _type_error "The argument is a utf8-flaged string" if utf8::is_utf8 ${$_[1]};
-  my $self = bless {
-    created_location => Carp::shortmess,
-  }, $_[0];
-  $self->{created_location} =~ s/\.?\s+\z//;
+  my $self = bless {caller => [caller $CallerLevel]}, $_[0];
   my $length = _to_index $_[1], 'Byte length';
 
   $self->{array_buffer_data} = $_[1];
@@ -53,10 +49,9 @@ sub _transfer ($) {
   my $transferred = bless {
     array_buffer_byte_length => $_[0]->{array_buffer_byte_length},
     array_buffer_data => $_[0]->{array_buffer_data},
-    created_location => Carp::shortmess,
+    caller => [caller ($CallerLevel + 1)],
     label => 'transferred from ' . $_[0]->debug_info,
   }, (ref $_[0]);
-  $transferred->{created_location} =~ s/\.?\s+\z//;
   $transferred->{allocation_delayed} = 1
       if delete $_[0]->{allocation_delayed}; # Not in JS
 
@@ -115,6 +110,7 @@ sub _clone ($$$$) {
   _note_buffer_copy $src_length, $src_buffer->debug_info, 'new clone';
 
   ## AllocateArrayBuffer, CopyDataBlockBytes
+  local $CallerLevel = $CallerLevel + 1;
   my $ab;
   if ($src_buffer->{allocation_delayed}) { # Not in JS
     my $target_block_value = "\x00" x $src_length;
@@ -187,7 +183,8 @@ sub debug_info ($) {
         $_[0]->{label},
         (defined $_[0]->{array_buffer_data}
              ? 'l=' . $_[0]->{array_buffer_byte_length} : 'detached'),
-        $_[0]->{created_location},
+        "file $_[0]->{caller}->[1]",
+        "line $_[0]->{caller}->[2]",
   ) . '}';
 } # debug_info
 

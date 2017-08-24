@@ -56,8 +56,9 @@ for (
     is $ta->length, 642;
     isa_ok $ta->buffer, 'ArrayBuffer';
     is $ta->buffer->byte_length, $ta->byte_length;
+    is $ta->buffer->debug_info, "{ArrayBuffer l=642 file @{[__FILE__]} line @{[__LINE__-7]}}";
     done $c;
-  } n => 6, name => [$class, 'length argument'];
+  } n => 7, name => [$class, 'length argument'];
 
   test {
     my $c = shift;
@@ -298,8 +299,9 @@ test {
   is $ta->byte_offset, 0;
   is $ta->length, $ta->byte_length;
   is $ta->buffer->byte_length, $ta->byte_length;
+  is $ta->buffer->debug_info, "{ArrayBuffer l=$size file @{[__FILE__]} line @{[__LINE__-6]}}";
   done $c;
-} n => 5, name => 'new_by_sysread';
+} n => 6, name => 'new_by_sysread';
 
 test {
   my $c = shift;

@@ -13,8 +13,9 @@ test {
   isa_ok $ab, 'ArrayBuffer';
   is $ab->byte_length, 0;
   ok not $ab->isa ('ArrayBufferView');
+  is $ab->debug_info, "{ArrayBuffer l=0 file @{[__FILE__]} line @{[__LINE__-4]}}";
   done $c;
-} n => 3, name => 'new 0';
+} n => 4, name => 'new 0';
 
 test {
   my $c = shift;
@@ -136,8 +137,9 @@ test {
   my $ab = ArrayBuffer->new_from_scalarref (\$s);
   isa_ok $ab, 'ArrayBuffer';
   is $ab->byte_length, 1042;
+  is $ab->debug_info, "{ArrayBuffer l=1042 file @{[__FILE__]} line @{[__LINE__-3]}}";
   done $c;
-} n => 2, name => 'new_from_scalarref 1042';
+} n => 3, name => 'new_from_scalarref 1042';
 
 test {
   my $c = shift;
@@ -365,8 +367,9 @@ test {
   is $ab2->byte_length, 4;
   my $ref2 = $ab2->manakai_transfer_to_scalarref;
   is $$ref2, "ghij";
+  is $ab2->debug_info, "{ArrayBuffer clone of {ArrayBuffer l=14 file @{[__FILE__]} line @{[__LINE__-5]}} detached file @{[__FILE__]} line @{[__LINE__-4]}}";
   done $c;
-} n =>2, name => '_clone allocated';
+} n => 3, name => '_clone allocated';
 
 test {
   my $c = shift;

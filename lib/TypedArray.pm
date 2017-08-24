@@ -41,6 +41,7 @@ sub new ($;$$$) {
       {
         my $element_size = $self->BYTES_PER_ELEMENT; ## Table->{ref $_[0]}
         my $byte_length = $element_size * $length;
+        local $ArrayBuffer::CallerLevel = $ArrayBuffer::CallerLevel + 1;
         $self->{viewed_array_buffer}
             = ArrayBuffer->new ($byte_length); ## AllocateArrayBuffer
         $self->{byte_length} = $byte_length;
@@ -141,6 +142,7 @@ sub new_by_sysread ($$) {
   my $buffer = '';
   my $bytes_read = sysread $fh, $buffer, (_to_index $byte_length, 'Byte length'), 0;
   die _io_error $! unless defined $bytes_read;
+  local $ArrayBuffer::CallerLevel = $ArrayBuffer::CallerLevel + 1;
   return $class->new
       (ArrayBuffer->new_from_scalarref (\$buffer), 0, $bytes_read);
 } # new_by_sysread
