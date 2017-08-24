@@ -1168,7 +1168,7 @@ sub DESTROY ($) {
 
 package ReadableStreamBYOBReader;
 use Streams::_Common;
-push our @CARP_NOT, qw(ReadableStream);
+push our @CARP_NOT, qw(ReadableStream ReadableByteStreamController);
 
 sub new ($$) {
   my $stream = $_[1];
