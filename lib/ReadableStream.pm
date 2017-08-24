@@ -50,9 +50,7 @@ sub new ($;$$) {
       if defined $_[1] and not ref $_[1] eq 'HASH'; # Not in JS
   die _type_error "Options is not a HASH"
       if defined $_[2] and not ref $_[2] eq 'HASH'; # Not in JS
-  my $self = bless {
-    created_location => Carp::shortmess,
-  }, $_[0];
+  my $self = bless {caller => [caller 0]}, $_[0];
   my $underlying_source = $_[1] || {};
   my $opts = $_[2] || {};
   $self->{state} = 'readable';
@@ -155,13 +153,11 @@ sub DESTROY ($) {
   local $@;
   eval { die };
   if ($@ =~ /during global destruction/) {
-    my $location = $_[0]->{created_location};
-    $location =~ s/\.?\s+\z//;
     my $diag = '';
     if ($_[0]->{state} eq 'readable') {
       $diag = ' (Stream is not closed)';
     }
-    warn "$$: Reference to @{[ref $_[0]]} created${location} is not discarded before global destruction$diag\n";
+    warn "$$: Reference to @{[ref $_[0]]} created at $_[0]->{caller}->[1] line $_[0]->{caller}->[2] is not discarded before global destruction$diag\n";
   }
 } # DESTROY
 
