@@ -17,6 +17,16 @@ sub new ($$) {
   return $self;
 } # new
 
+sub new_from_errno_and_message ($$$) {
+  my $self = bless {
+    name => 'Perl I/O error',
+    error => 0+$_[1],
+    message => ''.$_[2],
+  }, $_[0];
+  $self->_set_stacktrace;
+  return $self;
+} # new_from_errno_and_message
+
 sub errno ($) {
   return $_[0]->{error};
 } # errno

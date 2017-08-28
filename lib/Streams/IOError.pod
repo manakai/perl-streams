@@ -27,6 +27,11 @@ Create and return a new L<Streams::IOError> object.  The argument must
 be a dual value (i.e. a value that can be evaluated both as a number
 and as a string.
 
+=item $error = Streams::IOError->new_from_errno_and_message (0+$!, ""+$!)
+
+Create and return a new L<Streams::IOError> object.  The argument must
+be an error number and an error message string.
+
 =item $number = $error->errno
 
 The error number.
