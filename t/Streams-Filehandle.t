@@ -14,7 +14,7 @@ test {
   my $c = shift;
   my ($r, $w) = AnyEvent::Util::portable_pipe;
   AnyEvent::Util::fh_nonblocking $w, 1;
-  (Streams::Filehandle::write_to_fh $w, DataView->new (ArrayBuffer->new_from_scalarref (\"abc xyz")))->then (sub {
+  (Streams::Filehandle::write_to_fhref \$w, DataView->new (ArrayBuffer->new_from_scalarref (\"abc xyz")))->then (sub {
     close $w;
 
     my $bytes = <$r>;
@@ -24,14 +24,14 @@ test {
     done $c;
     undef $c;
   });
-} n => 1, name => 'write_to_fh DataView';
+} n => 1, name => 'write_to_fhref DataView';
 
 test {
   my $c = shift;
   my ($r, $w) = AnyEvent::Util::portable_pipe;
   AnyEvent::Util::fh_nonblocking $w, 1;
-  Streams::Filehandle::write_to_fh $w, DataView->new (ArrayBuffer->new_from_scalarref (\"abc xyz"));
-  (Streams::Filehandle::write_to_fh $w, "abc")->catch (sub {
+  Streams::Filehandle::write_to_fhref \$w, DataView->new (ArrayBuffer->new_from_scalarref (\"abc xyz"));
+  (Streams::Filehandle::write_to_fhref \$w, "abc")->catch (sub {
     my $error = $_[0];
     test {
       is $error->name, 'TypeError', $error;
@@ -49,15 +49,15 @@ test {
     done $c;
     undef $c;
   });
-} n => 5, name => 'write_to_fh not DataView';
+} n => 5, name => 'write_to_fhref not DataView';
 
 test {
   my $c = shift;
   my ($r, $w) = AnyEvent::Util::portable_pipe;
   AnyEvent::Util::fh_nonblocking $w, 1;
   my $code;
-  my $p = Streams::Filehandle::write_to_fh
-      $w, DataView->new (ArrayBuffer->new_from_scalarref (\"abc xyz")),
+  my $p = Streams::Filehandle::write_to_fhref
+      \$w, DataView->new (ArrayBuffer->new_from_scalarref (\"abc xyz")),
       cancel_ref => \$code;
   (promised_wait_until { defined $code } interval => 0.001, timeout => 3)->then (sub {
     test {
@@ -70,7 +70,7 @@ test {
     done $c;
     undef $c;
   });
-} n => 1, name => 'write_to_fh cancel_ref';
+} n => 1, name => 'write_to_fhref cancel_ref';
 
 ## There are more tests for Web::Transport::TCPStream in
 ## perl-web-resources and Promised::Command in perl-promised-command.

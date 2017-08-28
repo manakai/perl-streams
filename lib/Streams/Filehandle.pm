@@ -15,7 +15,7 @@ use DataView;
 ## perl-web-resources and Promised::Command in perl-promised-command.
 ## This might be changed into a public API in future, if desired.
 
-push our @CARP_NOT, qw(Streams::TypeError DataView);
+push our @CARP_NOT, qw(Streams::TypeError ArrayBuffer DataView);
 
 sub _writing (&$$) {
   my ($code, $fh, $cancel) = @_;
@@ -41,16 +41,16 @@ sub _writing (&$$) {
   return promised_cleanup { undef $try } Promise->resolve->then ($try);
 } # _writing
 
-sub write_to_fh ($$;%) {
-  my ($fh, $view, %args) = @_;
+sub write_to_fhref ($$;%) {
+  my ($fhref, $view, %args) = @_;
   return Promise->resolve->then (sub {
     die Streams::TypeError->new ("The argument is not an ArrayBufferView")
         unless UNIVERSAL::isa ($view, 'ArrayBufferView');
     return if $view->byte_length == 0;
     return _writing {
-      return 1 unless defined $fh; # end
+      return 1 unless defined $$fhref; # end
       my $l = eval { $view->buffer->manakai_syswrite
-                         ($fh, $view->byte_length, $view->byte_offset) };
+                         ($$fhref, $view->byte_length, $view->byte_offset) };
       if ($@) {
         my $errno = UNIVERSAL::isa ($@, 'Streams::IOError') ? $@->errno : 0;
         if ($errno != EAGAIN && $errno != EINTR &&
@@ -65,9 +65,9 @@ sub write_to_fh ($$;%) {
         return 1 if $view->byte_length == 0; # end
         return 0; # repeat
       }
-    } $fh, $args{cancel_ref} || \my $dummy;
+    } $$fhref, $args{cancel_ref} || \my $dummy;
   });
-} # write_to_fh
+} # write_to_fhref
 
 1;
 
