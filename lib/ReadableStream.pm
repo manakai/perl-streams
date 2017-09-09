@@ -954,10 +954,9 @@ sub ReadableByteStreamController::_respond_internal ($$) {
 } # ReadableByteStreamControllerRespondInternal
 
 sub new ($$$) {
-  my $stream = {readable_stream_controller => {}};
-  if (UNIVERSAL::isa ($_[1], 'ReadableByteStreamController')) {
-    $stream = ${$_[1]};
-  }
+  die _type_error "The argument is not a ReadableByteStreamController"
+      unless UNIVERSAL::isa ($_[1], 'ReadableByteStreamController');
+  my $stream = ${$_[1]};
   my $controller = $stream->{readable_stream_controller};
 
   my $byob_request = {};

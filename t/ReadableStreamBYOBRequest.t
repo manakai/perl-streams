@@ -8,17 +8,23 @@ use ReadableStream;
 
 test {
   my $c = shift;
+  my $rc;
+  my $rs = ReadableStream->new ({type => 'bytes', start => sub { $rc = $_[1] }});
   my $view = TypedArray::Uint8Array->new (ArrayBuffer->new (3));
-  my $req = ReadableStreamBYOBRequest->new (undef, $view);
+  my $req = ReadableStreamBYOBRequest->new ($rc, $view);
   is $req->view, $view;
+  undef $rc;
   done $c;
 } n => 1, name => 'view';
 
 test {
   my $c = shift;
+  my $rc;
+  my $rs = ReadableStream->new ({type => 'bytes', start => sub { $rc = $_[1] }});
   my $view = DataView->new (ArrayBuffer->new (3));
-  my $req = ReadableStreamBYOBRequest->new (undef, $view);
+  my $req = ReadableStreamBYOBRequest->new ($rc, $view);
   is $req->view, $view;
+  undef $rc;
   done $c;
 } n => 1, name => 'view';
 
@@ -203,47 +209,110 @@ test {
 
 test {
   my $c = shift;
-  my $req = ReadableStreamBYOBRequest->new (undef, undef);
-  my $view = TypedArray::Uint8Array->new (ArrayBuffer->new (3));
   eval {
-    $req->respond (4);
+    ReadableStreamBYOBRequest->new (undef, undef);
   };
-  like $@, qr{^TypeError: There is no controller at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
+  like $@, qr{^TypeError: The argument is not a ReadableByteStreamController at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
   done $c;
+} n => 1, name => 'respond not ReadableByteStreamController';
+
+test {
+  my $c = shift;
+  my $rc;
+  my $rs = ReadableStream->new ({
+    type => 'bytes',
+    pull => sub {
+      my $rc = $_[1];
+      my $req = $rc->byob_request;
+      $req->respond (1);
+
+      test {
+        eval {
+          $req->respond (4);
+        };
+        like $@, qr{^TypeError: There is no controller at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
+        done $c;
+        undef $c;
+      } $c;
+    },
+  });
+  my $reader = $rs->get_reader ('byob');
+  $reader->read (DataView->new (ArrayBuffer->new (1)));
 } n => 1, name => 'respond no controller';
 
 test {
   my $c = shift;
-  my $req = ReadableStreamBYOBRequest->new (undef, undef);
-  my $view = TypedArray::Uint8Array->new (ArrayBuffer->new (3));
-  open my $fh, '<', __FILE__;
-  eval {
-    $req->manakai_respond_by_sysread (4, $fh);
-  };
-  like $@, qr{^TypeError: There is no controller at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
-  done $c;
+  my $rc;
+  my $rs = ReadableStream->new ({
+    type => 'bytes',
+    pull => sub {
+      my $rc = $_[1];
+      my $req = $rc->byob_request;
+      $req->respond (1);
+
+      test {
+        open my $fh, '<', __FILE__;
+        eval {
+          $req->manakai_respond_by_sysread (4, $fh);
+        };
+        like $@, qr{^TypeError: There is no controller at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
+        done $c;
+        undef $c;
+      } $c;
+    },
+  });
+  my $reader = $rs->get_reader ('byob');
+  $reader->read (DataView->new (ArrayBuffer->new (1)));
 } n => 1, name => 'manakai_respond_by_sysread no controller';
 
 test {
   my $c = shift;
-  my $req = ReadableStreamBYOBRequest->new (undef, undef);
-  my $view = TypedArray::Uint8Array->new (ArrayBuffer->new (3));
-  eval {
-    $req->respond_with_new_view ($view);
-  };
-  like $@, qr{^TypeError: There is no controller at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
-  done $c;
+  my $rc;
+  my $rs = ReadableStream->new ({
+    type => 'bytes',
+    pull => sub {
+      my $rc = $_[1];
+      my $req = $rc->byob_request;
+      $req->respond (1);
+
+      test {
+        my $view = TypedArray::Uint8Array->new (ArrayBuffer->new (3));
+        eval {
+          $req->respond_with_new_view ($view);
+        };
+        like $@, qr{^TypeError: There is no controller at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
+        done $c;
+        undef $c;
+      } $c;
+    },
+  });
+  my $reader = $rs->get_reader ('byob');
+  $reader->read (DataView->new (ArrayBuffer->new (1)));
 } n => 1, name => 'respond_with_new_view no controller';
 
 test {
   my $c = shift;
-  my $req = ReadableStreamBYOBRequest->new (undef, undef);
-  my $view = TypedArray::Uint8Array->new (ArrayBuffer->new (3));
-  eval {
-    $req->manakai_respond_with_new_view ($view);
-  };
-  like $@, qr{^TypeError: There is no controller at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
-  done $c;
+  my $rc;
+  my $rs = ReadableStream->new ({
+    type => 'bytes',
+    pull => sub {
+      my $rc = $_[1];
+      my $req = $rc->byob_request;
+      $req->respond (1);
+
+      test {
+        my $view = TypedArray::Uint8Array->new (ArrayBuffer->new (3));
+        eval {
+          $req->manakai_respond_with_new_view ($view);
+        };
+        like $@, qr{^TypeError: There is no controller at \Q@{[__FILE__]}\E line \Q@{[__LINE__-2]}\E};
+        done $c;
+        undef $c;
+      } $c;
+    },
+  });
+  my $reader = $rs->get_reader ('byob');
+  $reader->read (DataView->new (ArrayBuffer->new (1)));
 } n => 1, name => 'manakai_respond_with_new_view no controller';
 
 for my $value (
