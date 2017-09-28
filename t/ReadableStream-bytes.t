@@ -799,6 +799,169 @@ test {
   });
 } n => 1, name => 'read after closed';
 
+test {
+  my $c = shift;
+  my $rs = ReadableStream->new ({
+    type => 'bytes',
+  });
+  my $reader = $rs->get_reader ('byob');
+  my $v = DataView->new (ArrayBuffer->new (4));
+  $v->buffer->_transfer; # detach
+  return $reader->read ($v)->then (sub {
+    test { ok 0 } $c;
+  }, sub {
+    my $error = $_[0];
+    test {
+      like $error, qr{^TypeError: ArrayBuffer is detached at \Q@{[__FILE__]}\E line @{[__LINE__+5]}.};
+    } $c;
+  })->then (sub {
+    done $c;
+    undef $c;
+  });
+} n => 1, name => 'read view detached';
+
+test {
+  my $c = shift;
+  my $rs = ReadableStream->new ({
+    type => 'bytes',
+  });
+  my $reader = $rs->get_reader ('byob');
+  my $v = DataView->new (ArrayBuffer->new (0));
+  return $reader->read ($v)->then (sub {
+    test { ok 0 } $c;
+  }, sub {
+    my $error = $_[0];
+    test {
+      like $error, qr{^TypeError: The ArrayBufferView is empty at \Q@{[__FILE__]}\E line @{[__LINE__+5]}.};
+    } $c;
+  })->then (sub {
+    done $c;
+    undef $c;
+  });
+} n => 1, name => 'read view empty';
+
+test {
+  my $c = shift;
+  Promise->resolve->then (sub {
+    my $rs = ReadableStream->new ({
+      type => 'bytes',
+      start => sub {
+        my $v = DataView->new (ArrayBuffer->new (4));
+        $v->buffer->_transfer; # detach
+        $_[1]->enqueue ($v);
+      },
+    });
+  })->then (sub {
+    test { ok 0 } $c;
+  }, sub {
+    my $error = $_[0];
+    test {
+      like $error, qr{^TypeError: ArrayBuffer is detached at \Q@{[__FILE__]}\E line @{[__LINE__-8]}.};
+    } $c;
+  })->then (sub {
+    done $c;
+    undef $c;
+  });
+} n => 1, name => 'enqueue detached view';
+
+test {
+  my $c = shift;
+  my $rs = ReadableStream->new ({
+    type => 'bytes',
+    pull => sub {
+      my $req = $_[1]->byob_request;
+      $req->view->buffer->_transfer; # detach
+      $req->respond (1);
+    },
+  });
+  my $reader = $rs->get_reader ('byob');
+  $reader->read (DataView->new (ArrayBuffer->new (43)))->then (sub {
+    test { ok 0 } $c;
+  }, sub {
+    my $error = $_[0];
+    test {
+      like $error, qr{^TypeError: ArrayBuffer is detached at \Q@{[__FILE__]}\E line @{[__LINE__-9]}.};
+    } $c;
+  })->then (sub {
+    done $c;
+    undef $c;
+  });
+} n => 1, name => 'respond detached view';
+
+test {
+  my $c = shift;
+  my $rs = ReadableStream->new ({
+    type => 'bytes',
+    pull => sub {
+      my $req = $_[1]->byob_request;
+      $req->view->buffer->_transfer; # detach
+      $req->manakai_respond_by_sysread (my $fh);
+    },
+  });
+  my $reader = $rs->get_reader ('byob');
+  $reader->read (DataView->new (ArrayBuffer->new (43)))->then (sub {
+    test { ok 0 } $c;
+  }, sub {
+    my $error = $_[0];
+    test {
+      like $error, qr{^TypeError: ArrayBuffer is detached at \Q@{[__FILE__]}\E line @{[__LINE__-9]}.};
+    } $c;
+  })->then (sub {
+    done $c;
+    undef $c;
+  });
+} n => 1, name => 'manakai_respond_by_sysread detached view';
+
+test {
+  my $c = shift;
+  my $rs = ReadableStream->new ({
+    type => 'bytes',
+    pull => sub {
+      my $req = $_[1]->byob_request;
+      my $dv = DataView->new (ArrayBuffer->new (43));
+      $dv->buffer->_transfer; # detach
+      $req->respond_with_new_view ($dv);
+    },
+  });
+  my $reader = $rs->get_reader ('byob');
+  $reader->read (DataView->new (ArrayBuffer->new (43)))->then (sub {
+    test { ok 0 } $c;
+  }, sub {
+    my $error = $_[0];
+    test {
+      like $error, qr{^TypeError: ArrayBuffer is detached at \Q@{[__FILE__]}\E line @{[__LINE__-9]}.};
+    } $c;
+  })->then (sub {
+    done $c;
+    undef $c;
+  });
+} n => 1, name => 'respond_with_new_view detached view';
+
+test {
+  my $c = shift;
+  my $rs = ReadableStream->new ({
+    type => 'bytes',
+    pull => sub {
+      my $req = $_[1]->byob_request;
+      my $dv = DataView->new (ArrayBuffer->new (4));
+      $dv->buffer->_transfer; # detach
+      $req->manakai_respond_with_new_view ($dv);
+    },
+  });
+  my $reader = $rs->get_reader ('byob');
+  $reader->read (DataView->new (ArrayBuffer->new (43)))->then (sub {
+    test { ok 0 } $c;
+  }, sub {
+    my $error = $_[0];
+    test {
+      like $error, qr{^TypeError: ArrayBuffer is detached at \Q@{[__FILE__]}\E line @{[__LINE__-9]}.};
+    } $c;
+  })->then (sub {
+    done $c;
+    undef $c;
+  });
+} n => 1, name => 'manakai_respond_with_new_view detached view';
+
 run_tests;
 
 =head1 LICENSE

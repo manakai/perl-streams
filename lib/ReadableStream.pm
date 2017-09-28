@@ -753,6 +753,8 @@ sub enqueue ($$) {
       unless $stream->{state} eq 'readable';
   die _type_error "The argument is not an ArrayBufferView"
       unless UNIVERSAL::isa ($_[1], 'ArrayBufferView'); # has [[ViewedArrayBuffer]]
+  die _type_error 'ArrayBuffer is detached'
+      if not defined $_[1]->buffer->{array_buffer_data}; ## IsDetachedBuffer
 
   ## ReadableByteStreamControllerEnqueue
   my $buffer = $_[1]->{viewed_array_buffer};
@@ -978,6 +980,8 @@ sub respond ($$) {
   die _type_error "There is no controller"
       unless defined ${$_[0]}->{state};
       #unless defined $_[0]->{associated_readable_byte_stream_controller};
+  die _type_error 'ArrayBuffer is detached'
+      if not defined $_[0]->view->buffer->{array_buffer_data}; ## IsDetachedBuffer
 
   ## ReadableByteStreamControllerRespond
   my $bytes_written = _to_size $_[1], 'Byte length';
@@ -992,6 +996,9 @@ sub manakai_respond_by_sysread ($$) {
       unless defined ${$_[0]}->{state};
       #unless defined $_[0]->{associated_readable_byte_stream_controller};
   my $view = $_[0]->view;
+  die _type_error 'ArrayBuffer is detached'
+      if not defined $view->buffer->{array_buffer_data}; ## IsDetachedBuffer
+
   $view->buffer->{array_buffer_data} = \(my $x = ''),
       delete $view->buffer->{allocation_delayed}
       unless ref $view->buffer->{array_buffer_data};
@@ -1020,6 +1027,8 @@ sub respond_with_new_view ($$) {
       #unless defined $_[0]->{associated_readable_byte_stream_controller};
   die _type_error "The argument is not an ArrayBufferView"
       unless UNIVERSAL::isa ($_[1], 'ArrayBufferView'); # has [[ViewedArrayBuffer]]
+  die _type_error 'ArrayBuffer is detached'
+      if not defined $_[1]->buffer->{array_buffer_data}; ## IsDetachedBuffer
 
   ## ReadableByteStreamControllerRespondWithNewView
   #my $controller = $_[0]->{associated_readable_byte_stream_controller};
@@ -1042,6 +1051,8 @@ sub manakai_respond_with_new_view ($$) {
       #unless defined $_[0]->{associated_readable_byte_stream_controller};
   die _type_error "The argument is not an ArrayBufferView"
       unless UNIVERSAL::isa ($_[1], 'ArrayBufferView'); # has [[ViewedArrayBuffer]]
+  die _type_error 'ArrayBuffer is detached'
+      if not defined $_[1]->buffer->{array_buffer_data}; ## IsDetachedBuffer
 
   ## A modified version of ReadableByteStreamControllerRespondWithNewView
   #my $controller = $_[0]->{associated_readable_byte_stream_controller};
@@ -1219,6 +1230,8 @@ sub read ($$) {
       unless defined $stream->{state};
   return Promise->reject (_type_error "The argument is not an ArrayBufferView")
       unless UNIVERSAL::isa ($view, 'ArrayBufferView'); # has [[ViewedArrayBuffer]]
+  return Promise->reject (_type_error ('ArrayBuffer is detached'))
+      if not defined $view->buffer->{array_buffer_data}; ## IsDetachedBuffer
   return Promise->reject (_type_error "The ArrayBufferView is empty")
       if $view->{byte_length} == 0;
 
