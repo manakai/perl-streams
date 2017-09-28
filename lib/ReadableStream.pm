@@ -1251,7 +1251,7 @@ sub read ($$) {
       $ctor = ref $view; ## [[TypedArrayName]]
     }
     my $pull_into_descriptor = {
-      buffer => $view->{viewed_array_buffer},
+      buffer => $view->{viewed_array_buffer}->_transfer,
       byte_offset => $view->{byte_offset},
       byte_length => $view->{byte_length},
       bytes_filled => 0,
@@ -1260,7 +1260,6 @@ sub read ($$) {
       reader_type => 'byob',
     };
     if (@{$controller->{pending_pull_intos}}) {
-      $pull_into_descriptor->{buffer} = $pull_into_descriptor->{buffer}->_transfer;
       push @{$controller->{pending_pull_intos}}, $pull_into_descriptor;
 
       ## ReadableStreamAddReadIntoRequest
@@ -1302,7 +1301,6 @@ sub read ($$) {
         return Promise->reject ($e);
       }
     }
-    $pull_into_descriptor->{buffer} = $pull_into_descriptor->{buffer}->_transfer;
     push @{$controller->{pending_pull_intos}}, $pull_into_descriptor;
 
     ## ReadableStreamAddReadIntoRequest
