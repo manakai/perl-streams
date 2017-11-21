@@ -35,10 +35,10 @@ sub new_from_scalarref ($$) {
       unless defined $_[1] and (ref $_[1] eq 'SCALAR' or ref $_[1] eq 'LVALUE');
   die _type_error "The argument is a utf8-flaged string" if utf8::is_utf8 ${$_[1]};
   my $self = bless {caller => [caller $CallerLevel]}, $_[0];
-  my $length = _to_index $_[1], 'Byte length';
+  my $length = _to_index length (${$_[1]}), 'Byte length';
 
   $self->{array_buffer_data} = $_[1];
-  $self->{array_buffer_byte_length} = length ${$_[1]};
+  $self->{array_buffer_byte_length} = $length;
 
   return $self;
 } # new_from_scalarref

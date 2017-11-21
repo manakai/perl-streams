@@ -218,6 +218,24 @@ test {
 
 test {
   my $c = shift;
+  my $x = "x" x (100*1024*1024);
+  my $ab = ArrayBuffer->new_from_scalarref (\$x);
+  is $ab->byte_length, 100*1024*1024;
+  is ${$ab->manakai_transfer_to_scalarref}, $x;
+  done $c;
+} n => 2, name => 'new_from_scalarref large string';
+
+test {
+  my $c = shift;
+  my $x = "x" x (2**31);
+  my $ab = ArrayBuffer->new_from_scalarref (\$x);
+  is $ab->byte_length, 2**31;
+  is ${$ab->manakai_transfer_to_scalarref}, $x;
+  done $c;
+} n => 2, name => 'new_from_scalarref large string';
+
+test {
+  my $c = shift;
   my $ab1 = ArrayBuffer->new (105);
   my $ab2 = $ab1->_transfer;
   isa_ok $ab2, 'ArrayBuffer';
