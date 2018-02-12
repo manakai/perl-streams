@@ -5,6 +5,8 @@ no warnings 'utf8';
 our $VERSION = '2.0';
 use Carp;
 
+## This module should not be used directly from applications.
+
 $Web::DOM::Error::L1ObjectClass->{(__PACKAGE__)} = 1;
 
 use overload
@@ -22,6 +24,13 @@ sub new ($$) {
   $self->_set_stacktrace;
   return $self;
 } # new
+
+sub wrap ($$) {
+  return $_[1] if $Web::DOM::Error::L1ObjectClass->{ref $_[1]};
+  return $_[0]->new (
+    (defined $_[1] && length $_[1]) ? $_[1] : "Something's wrong"
+  );
+} # wrap
 
 sub _set_stacktrace ($) {
   my $self = $_[0];
@@ -54,7 +63,7 @@ sub stringify ($) {
 
 =head1 LICENSE
 
-Copyright 2012-2017 Wakaba <wakaba@suikawiki.org>.
+Copyright 2012-2018 Wakaba <wakaba@suikawiki.org>.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.
