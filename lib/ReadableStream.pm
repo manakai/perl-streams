@@ -990,6 +990,17 @@ sub respond ($$) {
   return undef;
 } # respond(bytesWritten)
 
+sub manakai_respond_zero ($) {
+  die _type_error "There is no controller"
+      unless defined ${$_[0]}->{state};
+      #unless defined $_[0]->{associated_readable_byte_stream_controller};
+
+  ## ReadableByteStreamControllerRespond
+  ReadableByteStreamController::_respond_internal ${$_[0]}, 0;
+      #$_[0]->{associated_readable_byte_stream_controller}, 0;
+  return undef;
+} # manakai_respond_zero
+
 ## Not in JS.  Applications should not use this method.
 sub manakai_respond_by_sysread ($$) {
   die _type_error "There is no controller"
@@ -1347,7 +1358,7 @@ sub DESTROY ($) {
 
 =head1 LICENSE
 
-Copyright 2017 Wakaba <wakaba@suikawiki.org>.
+Copyright 2017-2018 Wakaba <wakaba@suikawiki.org>.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.

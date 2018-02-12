@@ -423,11 +423,45 @@ test {
   });
 } n => 3, name => 'byob_request returned object';
 
+test {
+  my $c = shift;
+
+  my $rs = ReadableStream->new ({
+    type => 'bytes',
+    pull => sub {
+      my $rc = $_[1];
+      my $req = $rc->byob_request;
+      $rc->close;
+      $req->manakai_respond_zero;
+    },
+  });
+
+  my $r = $rs->get_reader ('byob');
+  my $invoked = 0;
+  my $p1 = $r->read (DataView->new (ArrayBuffer->new (10)))->then (sub {
+    $invoked++;
+  });
+  my $p2 = $r->read (DataView->new (ArrayBuffer->new (10)))->then (sub {
+    $invoked++;
+  });
+
+  test {
+    is $invoked, 0;
+  } $c;
+  Promise->all ([$p1, $p2])->then (sub {
+    test {
+      is $invoked, 2;
+    } $c;
+    done $c;
+    undef $c;
+  });
+} n => 2, name => 'manakai_respond_zero';
+
 run_tests;
 
 =head1 LICENSE
 
-Copyright 2017 Wakaba <wakaba@suikawiki.org>.
+Copyright 2017-2018 Wakaba <wakaba@suikawiki.org>.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.
