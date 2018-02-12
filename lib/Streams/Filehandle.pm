@@ -77,11 +77,11 @@ sub write_to_fhref ($$;%) {
   });
 } # write_to_fhref
 
-sub fh_to_streams ($) {
-  my ($fh) = @_;
+sub fh_to_streams ($$$) {
+  my ($fh, $use_r, $use_w) = @_;
 
   my ($r_fh_closed, $s_fh_closed) = promised_cv;
-  my $read_active = 1;
+  my $read_active = $use_r ? 1 : 0;
   my $rcancel = sub { };
   my $wc;
   my $wcancel;
@@ -155,7 +155,7 @@ sub fh_to_streams ($) {
     });
   }; # $pull
 
-  my $read_stream = ReadableStream->new ({
+  my $read_stream = $use_r ? ReadableStream->new ({
     type => 'bytes',
     auto_allocate_chunk_size => 1024*2,
     pull => sub {
@@ -187,8 +187,8 @@ sub fh_to_streams ($) {
       undef $fh;
       $s_fh_closed->();
     }, # cancel
-  }); # $read_stream
-  my $write_stream = WritableStream->new ({
+  }) : undef; # $read_stream
+  my $write_stream = $use_w ? WritableStream->new ({
     start => sub {
       $wc = $_[1];
     },
@@ -245,7 +245,7 @@ sub fh_to_streams ($) {
       undef $fh;
       $s_fh_closed->();
     }, # abort
-  }); # $write_stream
+  }) : undef; # $write_stream
 
   AnyEvent::Util::fh_nonblocking $fh, 1;
 

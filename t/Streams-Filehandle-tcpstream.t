@@ -68,7 +68,7 @@ sub create ($$) {
     my $fh = $_[0];
 
     ($info->{readable}, $info->{writable}, $info->{closed})
-        = Streams::Filehandle::fh_to_streams $fh;
+        = Streams::Filehandle::fh_to_streams $fh, 1, 1;
 
     return $info;
   });
