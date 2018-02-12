@@ -1,5 +1,7 @@
 AnyEvent
+AnyEvent::Util
 Scalar::Util
+Socket
 
 # (Perl)
 Carp

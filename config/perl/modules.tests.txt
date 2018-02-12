@@ -1,3 +1,7 @@
+AnyEvent
+AnyEvent::Socket
+Carp
 File::Temp
 Path::Tiny
+Socket
 Test::More
