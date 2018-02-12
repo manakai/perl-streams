@@ -252,6 +252,16 @@ sub fh_to_streams ($$$) {
   return ($read_stream, $write_stream, $r_fh_closed);
 } # fh_to_streams
 
+sub create_readable ($$) {
+  my ($rs, undef, undef) = Streams::Filehandle::fh_to_streams $_[1], 1, 0;
+  return $rs;
+} # create_readable
+
+sub create_writable ($$) {
+  my (undef, $ws, undef) = Streams::Filehandle::fh_to_streams $_[1], 0, 1;
+  return $ws;
+} # create_writable
+
 1;
 
 =head1 LICENSE

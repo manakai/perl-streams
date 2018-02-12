@@ -1,0 +1,62 @@
+=head1 NAME
+
+Streams::Filehandle - Stream wrapper API for filehandles
+
+=head1 SYNOPSIS
+
+  use Streams::Filehandle;
+  
+  $rs = Streams::Filehandle->create_readable ($fh);
+  $ws = Streams::Filehandle->create_writable ($fh);
+
+=head1 DESCRIPTION
+
+The C<Streams::Filehandle> class has low-level class methods to
+convert filehandles into L<ReadableStream> and L<WritableStream>
+objects.
+
+=head1 METHODS
+
+There are these methods:
+
+=over 4
+
+=item $rs = Streams::Filehandle->create_readable ($fh)
+
+Create and return a L<ReadableStream> representing a readable byte
+stream which reads from the filehandle.  The argument must be a
+readable filehandle.
+
+If the readable stream is canceled, the filehandle is closed without
+reading the rest of the file.
+
+=item $ws = Streams::Filehandle->create_writable ($fh)
+
+Create and return a L<WritableStream> which writes into the
+filehandle.  The argument must be a writable filehandle.
+
+The writable stream expects zero or more writes of L<ArrayBufferView>
+objects, which are written into the filehandle in order.
+
+If the writable stream is aborted, the filehandle is closed without
+completing any pending writes.
+
+=back
+
+=head1 SEE ALSO
+
+L<Promised::File>, L<Web::Transport::TCPStream>,
+L<Web::Transport::UnixStream>.
+
+=head1 AUTHOR
+
+Wakaba <wakaba@suikawiki.org>.
+
+=head1 LICENSE
+
+Copyright 2016-2018 Wakaba <wakaba@suikawiki.org>.
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut
