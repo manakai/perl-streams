@@ -1,7 +1,7 @@
 package Streams::Filehandle;
 use strict;
 use warnings;
-our $VERSION = '1.0';
+our $VERSION = '2.0';
 use Errno qw(EAGAIN EWOULDBLOCK EINTR);
 use Socket qw(SOL_SOCKET SO_LINGER);
 use AnyEvent;
@@ -23,30 +23,30 @@ push our @CARP_NOT, qw(
   Streams::Error Streams::TypeError
   ArrayBuffer DataView
   ReadableStream ReadableStreamBYOBRequest WritableStream
+  Promised::Flow
 );
 
 sub _writing (&$$) {
   my ($code, $fh, $cancel) = @_;
   my $cancelled = 0;
   $$cancel = sub { $cancelled = 1 };
-  my $try; $try = sub {
-    return Promise->resolve if $cancelled or $code->();
+  return promised_until {
+    return 'done' if $cancelled or $code->();
     return Promise->new (sub {
       my $ok = $_[0];
       my $w; $w = AE::io $fh, 1, sub {
         undef $w;
         $$cancel = sub { $cancelled = 1 };
-        $ok->();
+        $ok->(not 'done');
       };
       $$cancel = sub {
         $cancelled = 1;
         undef $w;
         $$cancel = sub { };
-        $ok->();
+        $ok->(not 'done');
       };
-    })->then ($try);
+    });
   };
-  return promised_cleanup { undef $try } Promise->resolve->then ($try);
 } # _writing
 
 sub write_to_fhref ($$;%) {
@@ -165,14 +165,13 @@ sub fh_to_streams ($$$) {
         my $req = $rc->byob_request;
         $req->manakai_respond_zero if defined $req;
       };
-      my $run; $run = sub {
+      return promised_until {
         my $req = $rc->byob_request;
-        return Promise->resolve unless defined $req;
+        return 'done' unless defined $req;
         return $pull->($rc, $req, \$rcancel)->then (sub {
-          return $run->() if $_[0];
+          return not $_[0];
         });
       };
-      return $run->()->then (sub { undef $run });
     }, # pull
     cancel => sub {
       my $reason = defined $_[1] ? $_[1] : "Handle reader canceled";
