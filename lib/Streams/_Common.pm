@@ -24,6 +24,8 @@ sub import ($;@) {
   push @{$to_class.'::CARP_NOT'}, $from_class;
 } # import
 
+our $DefaultBufferSize ||= 10*1024*1024;
+
 sub _type_error ($) { Streams::TypeError->new ($_[0]) }
 sub _range_error ($) { Streams::RangeError->new ($_[0]) }
 sub _io_error ($) { Streams::IOError->new ($_[0]) }

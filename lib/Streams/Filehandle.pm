@@ -4,6 +4,7 @@ use warnings;
 our $VERSION = '2.0';
 use Errno qw(EAGAIN EWOULDBLOCK EINTR);
 use Socket qw(SOL_SOCKET SO_LINGER);
+use Streams::_Common;
 use AnyEvent;
 use AnyEvent::Util qw(WSAEWOULDBLOCK);
 use Promise;
@@ -157,7 +158,7 @@ sub fh_to_streams ($$$) {
 
   my $read_stream = $use_r ? ReadableStream->new ({
     type => 'bytes',
-    auto_allocate_chunk_size => 1024*2,
+    auto_allocate_chunk_size => $Streams::_Common::DefaultBufferSize,
     pull => sub {
       my $rc = $_[1];
       $rcancel = sub {
