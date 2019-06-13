@@ -977,7 +977,7 @@ sub view ($) {
 } # view
 
 sub respond ($$) {
-  die _type_error "There is no controller 1"
+  die _type_error "There is no controller"
       unless defined ${$_[0]}->{state};
       #unless defined $_[0]->{associated_readable_byte_stream_controller};
   die _type_error 'ArrayBuffer is detached'
@@ -991,7 +991,7 @@ sub respond ($$) {
 } # respond(bytesWritten)
 
 sub manakai_respond_zero ($) {
-  die _type_error "There is no controller 2"
+  die _type_error "There is no controller"
       unless defined ${$_[0]}->{state};
       #unless defined $_[0]->{associated_readable_byte_stream_controller};
 
@@ -1003,7 +1003,7 @@ sub manakai_respond_zero ($) {
 
 ## Not in JS.  Applications should not use this method.
 sub manakai_respond_by_sysread ($$) {
-  die _type_error "There is no controller 3"
+  die _type_error "There is no controller"
       unless defined ${$_[0]}->{state};
       #unless defined $_[0]->{associated_readable_byte_stream_controller};
   my $view = $_[0]->view;
@@ -1033,7 +1033,7 @@ sub manakai_respond_by_sysread ($$) {
 } # manakai_respond_by_sysread
 
 sub respond_with_new_view ($$) {
-  die _type_error "There is no controller 4"
+  die _type_error "There is no controller"
       unless defined ${$_[0]}->{state};
       #unless defined $_[0]->{associated_readable_byte_stream_controller};
   die _type_error "The argument is not an ArrayBufferView"
@@ -1057,7 +1057,7 @@ sub respond_with_new_view ($$) {
 
 ## Not in JS.  Applications should not use this method.
 sub manakai_respond_with_new_view ($$) {
-  die _type_error "There is no controller 5"
+  die _type_error "There is no controller"
       unless defined ${$_[0]}->{state};
       #unless defined $_[0]->{associated_readable_byte_stream_controller};
   die _type_error "The argument is not an ArrayBufferView"
