@@ -82,7 +82,8 @@ expected number of chunks in the queue.
 =back
 
 These are expected to be equivalent to JavaScript Streams API, as
-specified by WHATWG Streams Standard.
+specified by WHATWG Streams Standard (except for language
+differences).
 
 =head1 DEPENDENCY
 
@@ -90,7 +91,7 @@ Perl 5.10 or later is required.  The L<Scalar::Util> module, which is
 a core module, is required.
 
 These modules depend on L<Promise>
-<https://github.com/wakaba/perl-promise>.
+<https://github.com/manakai/perl-promise>.
 
 =head1 AVAILABILITY
 
@@ -107,7 +108,7 @@ Wakaba <wakaba@suikawiki.org>.
 
 =head1 LICENSE
 
-Copyright 2017-2018 Wakaba <wakaba@suikawiki.org>.
+Copyright 2017-2021 Wakaba <wakaba@suikawiki.org>.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.
