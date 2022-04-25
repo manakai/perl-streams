@@ -55,7 +55,6 @@ sub write_to_fhref ($$;%) {
   return Promise->resolve->then (sub {
     die Streams::TypeError->new ("The argument is not an ArrayBufferView")
         unless UNIVERSAL::isa ($view, 'ArrayBufferView');
-    return if $view->byte_length == 0;
     return _writing {
       return 1 unless defined $$fhref; # end
       my $l = eval { $view->buffer->manakai_syswrite
@@ -266,7 +265,7 @@ sub create_writable ($$) {
 
 =head1 LICENSE
 
-Copyright 2016-2018 Wakaba <wakaba@suikawiki.org>.
+Copyright 2016-2022 Wakaba <wakaba@suikawiki.org>.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.
