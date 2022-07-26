@@ -1,4 +1,4 @@
-AnyEvent::Socket
+AnyEvent::Util
 Carp~1.50
 File::Temp~0.2311
 Filter::Util::Call~1.61
